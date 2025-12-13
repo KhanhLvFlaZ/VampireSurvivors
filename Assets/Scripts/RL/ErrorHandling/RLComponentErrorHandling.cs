@@ -406,6 +406,21 @@ namespace Vampire.RL
         }
 
         /// <summary>
+        /// Implement IConfigurable - update parameter
+        /// </summary>
+        public void UpdateParameter(string parameterName, float value)
+        {
+            // RLErrorRecoveryCoordinator doesn't manage parameters directly,
+            // but can respond to configuration changes
+            switch (parameterName)
+            {
+                case "maxRecoveryAttempts":
+                    maxRecoveryAttempts = (int)value;
+                    break;
+            }
+        }
+
+        /// <summary>
         /// Implement IConfigurable - apply default configuration
         /// </summary>
         public void ApplyDefaults()

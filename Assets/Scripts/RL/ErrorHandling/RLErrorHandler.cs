@@ -371,6 +371,7 @@ namespace Vampire.RL
     /// </summary>
     public interface IConfigurable
     {
+        void UpdateParameter(string parameterName, float value);
         void ApplyDefaults();
     }
 

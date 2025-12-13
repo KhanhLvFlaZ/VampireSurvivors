@@ -319,7 +319,7 @@ namespace Vampire.RL
         /// Compare two model versions
         /// Requirements: 6.3
         /// </summary>
-        public ModelComparison CompareModels(string modelName, int version1, int version2)
+        public ModelVersionComparison CompareModels(string modelName, int version1, int version2)
         {
             var metadata1 = GetModelMetadata(modelName, version1);
             var metadata2 = GetModelMetadata(modelName, version2);
@@ -330,7 +330,7 @@ namespace Vampire.RL
                 return null;
             }
 
-            var comparison = new ModelComparison
+            var comparison = new ModelVersionComparison
             {
                 modelName = modelName,
                 version1 = version1,
@@ -439,32 +439,4 @@ namespace Vampire.RL
         #endregion
     }
 
-    /// <summary>
-    /// Model metadata for versioning and tracking
-    /// </summary>
-    [Serializable]
-    public class ModelMetadata
-    {
-        public string modelName;
-        public int version;
-        public string timestamp;
-        public string description;
-        public int totalEpisodesTrained;
-        public float averageReward;
-        public string trainingDuration;
-        public Dictionary<string, float> performanceMetrics = new Dictionary<string, float>();
-    }
-
-    /// <summary>
-    /// Model comparison result
-    /// </summary>
-    [Serializable]
-    public class ModelComparison
-    {
-        public string modelName;
-        public int version1;
-        public int version2;
-        public ModelMetadata metadata1;
-        public ModelMetadata metadata2;
-    }
 }
