@@ -1,0 +1,180 @@
+@startuml
+!pragma charset UTF-8
+skinparam style strictuml
+skinparam shadowing false
+skinparam ActivityFontName Arial
+skinparam ActivityFontSize 11
+
+title Tác tử Ra Quyết định - Activity Diagram
+
+start
+
+:RLMonster nhận **Update()** call;
+
+group "1. Nhận Quan sát (Observation)"
+  :RLEnvironment.CaptureGameState()\n- Get player position\n- Get nearby monsters\n- Get nearby items;
+  
+  :StateEncoder.EncodeState(gameState)\n- Encode player state (pos, vel, health)\n- Encode monster state (pos, health, action)\n- Encode nearby objects;
+  
+  :StateEncoder.NormalizeState(rawState)\n- Normalize to [-1, 1] range\n- Flatten to float[] observations;
+end group
+
+
+group "2. Chọn Hành động (Policy/Inference)"
+  if (isTrainingMode == true?) then (yes)
+    :DQNLearningAgent.SelectAction();
+    group "Training Mode"
+      if (Random() < explorationRate?) then (yes)
+        :Select **random action**;
+      else (no)
+        :INeuralNetwork.Forward(observations);
+        group "Policy Network Forward Pass"
+          :Load model weights\n- Input layer: observations\n- Hidden layers: Dense layers\n- Output layer: Q-values;
+          
+          :Forward propagation\n- Matrix multiplication\n- Activation functions (ReLU/Tanh);
+          
+          :Calculate Q-values for each action;
+        end group
+        :Select action with **max Q-value**;
+      endif
+    end group
+  else (no)
+    :RLMonster.SelectAction(observations);
+    group "Inference Mode"
+      :ModelManager.LoadCheckpoint()\n- Load pre-trained model;
+      
+      :INeuralNetwork.Forward(observations);
+      group "Policy Network Forward Pass"
+        :Load ONNX model weights\n- Input: observations (float[])\n- Hidden layers: Dense/Conv layers\n- Output: action probabilities;
+        
+        :Execute forward inference\n- Matrix multiplication\n- Activation functions;
+      end group
+      
+      if (useDeterministicPolicy?) then (yes)
+        :Select action with **argmax** probability;
+      else (no)
+        :Sample action from **probability distribution**;
+      endif
+    end group
+  endif
+  
+  :Validate action;
+  if (Action valid?) then (yes)
+    :Proceed with action;
+  else (no)
+    :Select **fallback action**;
+  endif
+end group
+
+
+group "3. Gửi Action & Thực thi (Execute Action)"
+  :MonsterAction action = selectedAction\n- actionType: Move/Attack/Special\n- direction: Vector2\n- intensity: 0-1;
+  
+  :EntityManager / MonsterController\n- Apply movement (transform.position)\n- Update animator state\n- Play sound effects\n- Check collisions;
+  
+  :Update monster state\n- position = newPosition\n- lastActionTime = Time.time\n- actionInProgress = true;
+end group
+
+group "4. Nhận Phản hồi (Reward Feedback)"
+  :Next frame: CaptureGameState()\n- Capture **newState** after action;
+  
+  :IRewardCalculator.CalculateReward();
+  group "Reward Calculation"
+    :Check action outcome\n- Damage dealt to player?\n- Took damage from player?\n- Moved closer/farther from player?;
+    
+    :Calculate components\n- Damage reward: +reward if hit player\n- Distance reward: +reward if close to player\n- Survival reward: +reward per time alive\n- Penalty: -penalty for ineffective actions;
+    
+    :Combine components\nreward = dmg_reward + dist_reward + survival_reward - penalties;
+    
+    :Reward shaping\n- Potential-based shaping\n- Normalize by constants;
+  end group
+  
+  :Store experience;
+  if (isTrainingMode?) then (yes)
+    :Add to ReplayBuffer\n- Store (state, action, reward, nextState, done);
+    
+    if (bufferSize >= batchSize?) then (yes)
+      :Sample batch from buffer;
+      :DQNLearningAgent.TrainStep();
+      group "Training Update"
+        :Calculate Q-target\n- Q_target = reward + γ * max Q(nextState);
+        
+        :Calculate Q-predicted\n- Q_pred = Q(state, action);
+        
+        :Compute loss\n- Loss = (Q_target - Q_pred)²;
+        
+        :Backward pass\n- Compute gradients;
+        
+        :Update weights\n- weights -= learningRate * gradients;
+      end group
+    endif
+  else (no)
+    :Only log metrics\n- PerformanceMonitor.RecordMetrics();
+  endif
+end group
+
+group "5. Cập nhật Trạng thái (Update State)"
+  :currentState = nextState;
+  :previousState = currentState;
+  
+  :Update tracking variables\n- timeAlive += deltaTime\n- timeSinceLastDamage += deltaTime\n- timeSinceLastAttack += deltaTime\n- updateCounter += 1;
+  
+  :Check episode end condition;
+  if (Monster dead?) then (yes)
+    :CalculateTerminalReward();
+    :End episode;
+  else if (Time limit exceeded?) then (yes)
+    :CalculateTerminalReward();
+    :End episode;
+  else (no)
+    :Continue to next frame;
+  endif
+end group
+
+group "6. Logging & Monitoring"
+  :PerformanceMonitor.RecordFrameMetrics()\n- Inference latency\n- Memory usage\n- Frame time;
+  
+  if (collectDetailedMetrics?) then (yes)
+    :Log to file/TensorBoard\n- Episode statistics\n- Reward history\n- Action distribution;
+  endif
+end group
+
+end
+
+note right
+  **Key Components Referenced:**
+  
+  • **RLMonster** (Vampire.RL)
+    - IsTraining property
+    - SelectAction()
+  
+  • **StateEncoder** (Vampire.RL)
+    - EncodeState()
+    - NormalizeState()
+  
+  • **RLEnvironment** (Vampire.RL)
+    - CaptureGameState()
+  
+  • **IRewardCalculator**
+    - CalculateReward()
+    - CalculateTerminalReward()
+  
+  • **DQNLearningAgent**
+    - SelectAction()
+    - TrainStep()
+  
+  • **ModelManager**
+    - LoadCheckpoint()
+    - Forward inference (ONNX)
+  
+  • **PerformanceMonitor**
+    - RecordFrameMetrics()
+  
+  **Hyperparameters:**
+  • explorationRate: ε-greedy
+  • learningRate: α
+  • discountFactor: γ
+  • maxInferenceTime: <16ms
+end note
+
+@enduml
