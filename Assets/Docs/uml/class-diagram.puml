@@ -1,0 +1,120 @@
+@startuml
+skinparam classAttributeIconSize 0
+skinparam style strictuml
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam class {
+  BackgroundColor White
+}
+
+title RL System - Class Diagram
+
+package "RLSystem" {
+  class TrainingCoordinator {
+    +startTraining(): void
+    +stopTraining(): void
+    +resetEpisode(): void
+    +currentEpisode: int
+    +maxEpisodes: int
+  }
+}
+
+package "Agent" {
+  class RLMonster {
+    +collectObservations(): void
+    +decideAction(): void
+    +applyReward(value: float): void
+    +loadPolicy(modelId: string): void
+    -policy: any
+    -lastAction: string
+  }
+}
+
+package "EnvironmentManager" {
+  class LevelManager {
+    +initializeLevel(seed: int): void
+    +spawnEnemies(count: int): void
+    +applyAction(action: string): void
+    +computeReward(): float
+    +isTerminal(): bool
+  }
+}
+
+package "ModelManager" {
+  class ModelManager {
+    +save(modelId: string): void
+    +load(modelId: string): any
+    +version(modelId: string): string
+    +getMetadata(modelId: string): Map
+  }
+}
+
+package "PerformanceMonitor" {
+  class PerformanceValidator {
+    +startRun(): void
+    +endRun(): void
+    +recordLatency(ms: float): void
+    +recordResource(cpu: float, memMB: float): void
+    +recordReward(value: float): void
+    +getReport(): Map
+  }
+}
+
+package "ObservationProvider" {
+  class StateEncoder {
+    +captureState(): Map
+    +encode(): List<float>
+    +normalize(): List<float>
+  }
+}
+
+' Relationships
+TrainingCoordinator --> RLMonster : coordinates agent
+TrainingCoordinator --> LevelManager : controls environment lifecycle
+TrainingCoordinator --> ModelManager : manage model versions
+TrainingCoordinator --> PerformanceValidator : track performance
+TrainingCoordinator --> StateEncoder : orchestrate observation flow
+
+RLMonster --> StateEncoder : request observations
+RLMonster --> LevelManager : send actions
+RLMonster <-- LevelManager : receive rewards
+RLMonster --> ModelManager : load policy
+
+PerformanceValidator ..> RLMonster : observe actions/rewards
+PerformanceValidator ..> LevelManager : sample environment metrics
+PerformanceValidator ..> ModelManager : track model info
+
+StateEncoder ..> LevelManager : read world state
+
+note top of TrainingCoordinator
+- Episode orchestration
+- Trains across multiple episodes
+- Integrates monitoring and model management
+end note
+
+note right of RLMonster
+- Agent uses observations to choose actions
+- Updates reward from environment
+end note
+
+note left of LevelManager
+- Manages map and spawns enemies/objects
+- Computes terminal conditions and rewards
+end note
+
+note bottom of ModelManager
+- Persist/load models and metadata
+- Handle versioning for reproducibility
+end note
+
+note right of PerformanceValidator
+- Measures latency, CPU/memory usage, reward trends
+- Produces reports for validation
+end note
+
+note left of StateEncoder
+- Gathers raw state from environment
+- Produces normalized feature vectors
+end note
+
+@enduml

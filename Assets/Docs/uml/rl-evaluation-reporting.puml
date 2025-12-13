@@ -1,0 +1,294 @@
+@startuml
+!pragma charset UTF-8
+autonumber
+skinparam style strictuml
+skinparam shadowing false
+skinparam sequenceArrowThickness 1
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 15
+skinparam BoxPadding 8
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam dpi 150
+skinparam responseMessageBelowArrow true
+
+title Đánh giá & Ghi Log Kết quả RL Models
+
+actor "Tester/QA" as Tester
+participant "ModelEvaluationSystem" as Eval
+participant "PerformanceValidator" as Validator
+participant "ModelManager" as Model
+participant "RLEnvironment" as Env
+participant "RLMonster" as Agent
+participant "PerformanceMonitor" as Perf
+participant "ReportGenerator" as Report
+
+== Khởi tạo Đánh giá ==
+Tester -> Eval: RegisterModel(modelName, modelPath)
+activate Eval
+Eval -> Eval: CreateModelMetadata()
+Eval -> Eval: GetFileSize()
+Eval --> Tester: model registered
+deactivate Eval
+
+Tester -> Eval: RegisterModel(modelName2, modelPath2)
+activate Eval
+Eval -> Eval: CreateModelMetadata()
+Eval --> Tester: model registered
+deactivate Eval
+
+== Chạy Kịch bản Test ==
+Tester -> Validator: RunPerformanceValidation()
+activate Validator
+
+group Test Inference Performance
+  Validator -> Validator: CreateTestAgent()
+  
+  loop validationSampleCount (100 samples)
+    Validator -> Agent: SelectAction(testState, inference=true)
+    activate Agent
+    Agent -> Model: Predict(observations)
+    activate Model
+    Model --> Agent: action
+    deactivate Model
+    Agent --> Validator: action, inferenceTime
+    deactivate Agent
+    
+    Validator -> Validator: RecordInferenceTime(elapsedMs)
+  end
+  
+  Validator -> Validator: CalculateStatistics(avgTime, maxTime, stdDev)
+  Validator -> Validator: CheckPassed(avgTime <= targetInferenceTimeMs)
+end
+
+group Test Memory Usage
+  Validator -> Perf: GetCurrentMemoryUsage()
+  activate Perf
+  Perf -> Perf: QuerySystemMemory()
+  Perf --> Validator: memoryMB
+  deactivate Perf
+  
+  Validator -> Validator: CheckPassed(memory <= maxMemoryMB)
+end
+
+group Test Latency
+  Validator -> Agent: MeasureDecisionLatency()
+  activate Agent
+  Agent -> Agent: StartTimer()
+  Agent -> Model: Forward(observations)
+  activate Model
+  Model --> Agent: action
+  deactivate Model
+  Agent -> Agent: EndTimer()
+  Agent --> Validator: latencyMs
+  deactivate Agent
+  
+  Validator -> Validator: CheckPassed(latency <= targetLatencyMs)
+end
+
+group Test Throughput
+  Validator -> Validator: CreateMultipleAgents(10)
+  
+  loop single frame
+    Validator -> Agent: BatchInference(allAgents)
+    activate Agent
+    Agent -> Model: BatchPredict(observations[])
+    activate Model
+    Model --> Agent: actions[]
+    deactivate Model
+    Agent --> Validator: agentsProcessed
+    deactivate Agent
+  end
+  
+  Validator -> Validator: CheckPassed(agentsProcessed >= minThroughput)
+end
+
+Validator -> Validator: AggregateValidationResults()
+Validator --> Tester: validationResults
+deactivate Validator
+
+== Đánh giá Models ==
+Tester -> Eval: CompareModels([modelName, modelName2], environment)
+activate Eval
+
+loop cho mỗi model
+  Eval -> Model: LoadCheckpoint(modelName)
+  activate Model
+  Model -> Model: LoadONNXModel()
+  Model --> Eval: model loaded
+  deactivate Model
+  
+  Eval -> Eval: EvaluateModel(modelName, environment)
+  activate Eval
+  
+  loop evaluationEpisodes (10 episodes)
+    Eval -> Env: ResetEnvironment()
+    activate Env
+    Env --> Eval: initialState
+    deactivate Env
+    
+    loop mỗi step trong episode
+      Eval -> Agent: RequestDecision(state)
+      activate Agent
+      Agent -> Model: Predict(observations)
+      activate Model
+      Model --> Agent: action (deterministic)
+      deactivate Model
+      Agent --> Eval: action
+      deactivate Agent
+      
+      Eval -> Env: Step(action)
+      activate Env
+      Env -> Env: ApplyAction()
+      Env -> Env: CalculateReward()
+      Env --> Eval: reward, nextState, done
+      deactivate Env
+      
+      Eval -> Eval: AccumulateReward(reward)
+      
+      alt done == true
+        Eval -> Eval: RecordEpisodeReward(totalReward)
+      end
+    end
+  end
+  
+  Eval -> Eval: CalculateEvaluationStats()
+  activate Eval
+  Eval -> Eval: ComputeAverage(episodeRewards)
+  Eval -> Eval: ComputeMax/Min()
+  Eval -> Eval: ComputeStdDev()
+  Eval --> Eval: EvaluationResult
+  deactivate Eval
+  
+  deactivate Eval
+end
+
+Eval -> Eval: RankModels(byAverageReward)
+Eval -> Eval: CreateModelComparison()
+Eval --> Tester: ModelComparison
+deactivate Eval
+
+== Ghi Log & Tạo Báo cáo ==
+Tester -> Report: GenerateEvaluationReport(validationResults, modelComparison)
+activate Report
+
+Report -> Report: CreateReportDocument()
+
+group Performance Validation Section
+  Report -> Report: FormatValidationResults()
+  Report -> Report: AddInferenceTimeChart()
+  Report -> Report: AddMemoryUsageChart()
+  Report -> Report: AddLatencyChart()
+  Report -> Report: AddThroughputChart()
+end
+
+group Model Comparison Section
+  Report -> Report: CreateComparisonTable()
+  Report -> Report: AddRankingTable()
+  Report -> Report: AddRewardStatistics()
+  Report -> Report: AddPerformanceMetrics()
+end
+
+group Detailed Logs Section
+  Report -> Perf: GetDetailedMetrics()
+  activate Perf
+  Perf -> Perf: AggregateFrameData()
+  Perf --> Report: performanceMetrics
+  deactivate Perf
+  
+  Report -> Report: AppendPerformanceLogs()
+  Report -> Report: AppendEpisodeRewards()
+end
+
+Report -> Report: ExportToJSON()
+Report -> Report: ExportToHTML()
+Report -> Report: ExportToCSV()
+
+Report --> Tester: reportPaths
+deactivate Report
+
+alt validation failed
+  Tester -> Tester: ReviewFailedTests()
+  Tester -> Model: RollbackToVersion(previousVersion)
+  activate Model
+  Model --> Tester: rollback complete
+  deactivate Model
+else validation passed
+  Tester -> Model: PromoteModel(modelName, "production")
+  activate Model
+  Model -> Model: UpdateMetadata(status="production")
+  Model --> Tester: model promoted
+  deactivate Model
+end
+
+note over Tester
+  **Tester/QA**
+  - Khởi tạo evaluation
+  - Chạy test scenarios
+  - Review kết quả
+  - Quyết định deploy/rollback
+end note
+
+note over Eval
+  **ModelEvaluationSystem**
+  Scripts/RL/Configuration/ModelEvaluationSystem.cs
+  - RegisterModel()
+  - EvaluateModel() - chạy N episodes
+  - CompareModels() - ranking
+  - CalculateStatistics()
+end note
+
+note over Validator
+  **PerformanceValidator**
+  Scripts/RL/Integration/PerformanceValidator.cs
+  - RunPerformanceValidation()
+  - TestInferencePerformance()
+  - TestMemoryUsage()
+  - TestLatency() / TestThroughput()
+  - Targets: <16ms, <100MB
+end note
+
+note over Model
+  **ModelManager**
+  Scripts/RL/Core/ModelManager.cs
+  - LoadCheckpoint(modelName)
+  - SaveCheckpoint()
+  - Model versioning
+  - Metadata management
+end note
+
+note over Env
+  **RLEnvironment**
+  Scripts/RL/Core/RLEnvironment.cs
+  - Test environment simulation
+  - Deterministic episode runs
+  - Reward calculation
+end note
+
+note over Agent
+  **RLMonster**
+  Scripts/RL/Integration/RLMonster.cs
+  - Inference mode (no training)
+  - Deterministic policy (no exploration)
+  - Performance measurement
+end note
+
+note over Perf
+  **PerformanceMonitor**
+  Scripts/RL/Core/PerformanceMonitor.cs
+  - Track inference time
+  - Monitor memory usage
+  - Record frame metrics
+  - Generate performance data
+end note
+
+note over Report
+  **ReportGenerator**
+  (Implicit - từ các Export methods)
+  - Format results
+  - Generate charts
+  - Export JSON/HTML/CSV
+  - Performance dashboards
+end note
+
+@enduml
