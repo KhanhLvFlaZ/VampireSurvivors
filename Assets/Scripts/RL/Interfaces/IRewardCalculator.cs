@@ -10,6 +10,15 @@ namespace Vampire.RL
         /// <summary>
         /// Calculate reward for a monster action
         /// </summary>
+        /// <param name="monster">Monster that took the action</param>
+        /// <param name="action">Action taken</param>
+        /// <param name="previousState">State before action</param>
+        /// <returns>Reward value</returns>
+        float CalculateReward(Monster monster, int action, float[] previousState);
+
+        /// <summary>
+        /// Calculate reward for a monster action with detailed context
+        /// </summary>
         /// <param name="previousState">State before action</param>
         /// <param name="action">Action taken</param>
         /// <param name="currentState">State after action</param>
@@ -33,5 +42,11 @@ namespace Vampire.RL
         /// <param name="state">Current state</param>
         /// <returns>Shaped reward</returns>
         float ShapeReward(float baseReward, RLGameState state);
+
+        /// <summary>
+        /// Update reward configuration at runtime
+        /// </summary>
+        /// <param name="rewardComponents">New reward configuration</param>
+        void UpdateRewardConfiguration(object rewardComponents);
     }
 }

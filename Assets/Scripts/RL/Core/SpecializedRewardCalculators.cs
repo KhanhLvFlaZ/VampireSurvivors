@@ -21,6 +21,11 @@ namespace Vampire.RL
                 this.monsterConfig = monsterConfig;
             }
 
+            public float CalculateReward(Monster monster, int action, float[] previousState)
+            {
+                return 0f;
+            }
+
             public float CalculateReward(RLGameState previousState, MonsterAction action, RLGameState currentState, ActionOutcome actionOutcome)
             {
                 // Only provide immediate reward for hitting player
@@ -28,30 +33,35 @@ namespace Vampire.RL
                 {
                     return rewardConfig.hitReward + (actionOutcome.damageDealt * rewardConfig.damageRewardMultiplier);
                 }
-                
+
                 return 0f; // No intermediate rewards
             }
 
             public float CalculateTerminalReward(RLGameState finalState, float episodeLength, bool killedByPlayer)
             {
                 float reward = 0f;
-                
+
                 if (killedByPlayer)
                 {
                     reward += rewardConfig.deathPenalty;
                 }
-                
+
                 if (finalState.playerHealth <= 0f)
                 {
                     reward += rewardConfig.killPlayerReward;
                 }
-                
+
                 return reward;
             }
 
             public float ShapeReward(float baseReward, RLGameState state)
             {
                 return baseReward; // No shaping for sparse rewards
+            }
+
+            public void UpdateRewardConfiguration(object rewardComponents)
+            {
+                // Update configuration if needed
             }
         }
 
@@ -73,31 +83,36 @@ namespace Vampire.RL
                 this.isInitialized = false;
             }
 
+            public float CalculateReward(Monster monster, int action, float[] previousState)
+            {
+                return 0f;
+            }
+
             public float CalculateReward(RLGameState previousState, MonsterAction action, RLGameState currentState, ActionOutcome actionOutcome)
             {
                 float extrinsicReward = CalculateExtrinsicReward(actionOutcome);
                 float intrinsicReward = CalculateIntrinsicReward(previousState, currentState);
-                
+
                 return extrinsicReward + intrinsicReward;
             }
 
             public float CalculateTerminalReward(RLGameState finalState, float episodeLength, bool killedByPlayer)
             {
                 float reward = 0f;
-                
+
                 if (killedByPlayer)
                 {
                     reward += rewardConfig.deathPenalty;
                 }
-                
+
                 if (finalState.playerHealth <= 0f)
                 {
                     reward += rewardConfig.killPlayerReward;
                 }
-                
+
                 // Curiosity bonus for exploration
                 reward += episodeLength * 0.1f; // Small bonus for longer episodes
-                
+
                 return reward;
             }
 
@@ -109,13 +124,13 @@ namespace Vampire.RL
             private float CalculateExtrinsicReward(ActionOutcome actionOutcome)
             {
                 float reward = 0f;
-                
+
                 if (actionOutcome.hitPlayer)
                 {
                     reward += rewardConfig.hitReward;
                     reward += actionOutcome.damageDealt * rewardConfig.damageRewardMultiplier;
                 }
-                
+
                 return reward;
             }
 
@@ -134,7 +149,7 @@ namespace Vampire.RL
                 // Reward for causing player state changes (curiosity about effect on environment)
                 float playerMovement = Vector2.Distance(lastPlayerPosition, currentState.playerPosition);
                 float playerHealthChange = Mathf.Abs(lastPlayerHealth - currentState.playerHealth);
-                
+
                 intrinsicReward += playerMovement * 0.1f; // Small reward for causing player to move
                 intrinsicReward += playerHealthChange * 0.5f; // Reward for affecting player health
 
@@ -143,6 +158,11 @@ namespace Vampire.RL
                 lastPlayerHealth = currentState.playerHealth;
 
                 return intrinsicReward;
+            }
+
+            public void UpdateRewardConfiguration(object rewardComponents)
+            {
+                // Update configuration if needed
             }
         }
 
@@ -165,20 +185,26 @@ namespace Vampire.RL
                 this.episodeCount = 0;
             }
 
+            public float CalculateReward(Monster monster, int action, float[] previousState)
+            {
+                // Simple reward calculation from basic state
+                return 0f;
+            }
+
             public float CalculateReward(RLGameState previousState, MonsterAction action, RLGameState currentState, ActionOutcome actionOutcome)
             {
                 float baseReward = CalculateBaseReward(actionOutcome);
-                
+
                 // Adapt reward based on recent performance
                 float adaptationMultiplier = CalculateAdaptationMultiplier();
-                
+
                 return baseReward * adaptationMultiplier;
             }
 
             public float CalculateTerminalReward(RLGameState finalState, float episodeLength, bool killedByPlayer)
             {
                 float reward = 0f;
-                
+
                 if (killedByPlayer)
                 {
                     reward += rewardConfig.deathPenalty;
@@ -188,13 +214,13 @@ namespace Vampire.RL
                 {
                     UpdatePerformance(0.5f); // Neutral performance
                 }
-                
+
                 if (finalState.playerHealth <= 0f)
                 {
                     reward += rewardConfig.killPlayerReward;
                     UpdatePerformance(1f); // Excellent performance
                 }
-                
+
                 episodeCount++;
                 return reward;
             }
@@ -203,41 +229,41 @@ namespace Vampire.RL
             {
                 // Standard shaping with adaptation
                 float shapedReward = baseReward;
-                
+
                 float distance = state.DistanceToPlayer;
                 if (distance <= rewardConfig.optimalDistance)
                 {
                     shapedReward += rewardConfig.optimalDistanceReward;
                 }
-                
+
                 return shapedReward;
             }
 
             private float CalculateBaseReward(ActionOutcome actionOutcome)
             {
                 float reward = 0f;
-                
+
                 if (actionOutcome.hitPlayer)
                 {
                     reward += rewardConfig.hitReward;
                     reward += actionOutcome.damageDealt * rewardConfig.damageRewardMultiplier;
                 }
-                
+
                 if (actionOutcome.coordinated)
                 {
                     reward += rewardConfig.coordinationReward;
                 }
-                
+
                 return reward;
             }
 
             private float CalculateAdaptationMultiplier()
             {
                 if (episodeCount < 10) return 1f; // No adaptation for first few episodes
-                
+
                 // Increase rewards if performance is poor, decrease if too good
                 float avgPerformance = performanceHistory / episodeCount;
-                
+
                 if (avgPerformance < -0.5f) // Poor performance
                 {
                     return 1.5f; // Increase rewards to encourage learning
@@ -246,7 +272,7 @@ namespace Vampire.RL
                 {
                     return 0.8f; // Decrease rewards to maintain challenge
                 }
-                
+
                 return 1f; // Normal rewards
             }
 
@@ -254,7 +280,78 @@ namespace Vampire.RL
             {
                 performanceHistory = Mathf.Lerp(performanceHistory, performance, adaptationRate);
             }
+
+            public void UpdateRewardConfiguration(object rewardComponents)
+            {
+                // Update reward configuration if needed
+            }
         }
+
+        /// <summary>
+        /// Dense reward calculator - provides frequent rewards
+        /// </summary>
+        public class DenseRewardCalculator : IRewardCalculator
+        {
+            private RewardConfig rewardConfig;
+            private MonsterRLConfig monsterConfig;
+
+            public DenseRewardCalculator(RewardConfig rewardConfig, MonsterRLConfig monsterConfig)
+            {
+                this.rewardConfig = rewardConfig;
+                this.monsterConfig = monsterConfig;
+            }
+
+            public float CalculateReward(Monster monster, int action, float[] previousState)
+            {
+                return 0f;
+            }
+
+            public float CalculateReward(RLGameState previousState, MonsterAction action, RLGameState currentState, ActionOutcome actionOutcome)
+            {
+                float reward = 0f;
+
+                if (actionOutcome.hitPlayer)
+                {
+                    reward += rewardConfig.hitReward;
+                    reward += actionOutcome.damageDealt * rewardConfig.damageRewardMultiplier;
+                }
+
+                if (actionOutcome.coordinated)
+                {
+                    reward += rewardConfig.coordinationReward;
+                }
+
+                return reward;
+            }
+
+            public float CalculateTerminalReward(RLGameState finalState, float episodeLength, bool killedByPlayer)
+            {
+                float reward = 0f;
+
+                if (killedByPlayer)
+                {
+                    reward += rewardConfig.deathPenalty;
+                }
+
+                if (finalState.playerHealth <= 0f)
+                {
+                    reward += rewardConfig.killPlayerReward;
+                }
+
+                return reward;
+            }
+
+            public float ShapeReward(float baseReward, RLGameState state)
+            {
+                return baseReward;
+            }
+
+            public void UpdateRewardConfiguration(object rewardComponents)
+            {
+                // Update configuration if needed
+            }
+        }
+
 
         /// <summary>
         /// Create specialized reward calculator based on type
@@ -270,7 +367,8 @@ namespace Vampire.RL
                 case RewardFunctionType.Dense:
                 case RewardFunctionType.Shaped:
                 default:
-                    return new RewardCalculator(rewardConfig, monsterConfig);
+                    // Return a default dense reward calculator
+                    return new DenseRewardCalculator(rewardConfig, monsterConfig);
             }
         }
 

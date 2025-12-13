@@ -1,11 +1,12 @@
 {
-    "name": "Vampire.RL",
-    "rootNamespace": "Vampire.RL",
+    "name": "Vampire",
+    "rootNamespace": "Vampire",
     "references": [
-        "Vampire",
         "Unity.TextMeshPro",
-        "Unity.ML-Agents",
-        "Unity.ML-Agents.Extensions"
+        "Unity.InputSystem",
+        "Unity.Localization",
+        "Unity.Localization.Editor",
+        "Unity.Addressables"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

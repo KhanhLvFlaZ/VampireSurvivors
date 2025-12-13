@@ -24,19 +24,24 @@ namespace Vampire.RL
 
             // Load or create reward config
             RewardConfig rewardConfig = GetRewardConfig(monsterType);
-            
+
             // Use provided monster config or create default
             if (monsterConfig == null)
             {
                 monsterConfig = MonsterRLConfig.CreateDefault(monsterType);
             }
 
-            // Create new calculator
-            RewardCalculator calculator = new RewardCalculator(rewardConfig, monsterConfig);
-            
-            // Cache for future use
-            calculatorCache[monsterType] = calculator;
-            
+            // Note: RewardCalculator is a MonoBehaviour and must be found in the scene
+            // or added to a GameObject through the Unity Editor
+            // For now, return null if not cached
+            RewardCalculator calculator = null;
+
+            // Cache for future use if found
+            if (calculator != null)
+            {
+                calculatorCache[monsterType] = calculator;
+            }
+
             return calculator;
         }
 
@@ -52,7 +57,7 @@ namespace Vampire.RL
 
             // Try to load from Resources first
             RewardConfig loadedConfig = LoadRewardConfigFromResources(monsterType);
-            
+
             if (loadedConfig == null)
             {
                 // Create default config if none found
@@ -61,7 +66,7 @@ namespace Vampire.RL
 
             // Cache the config
             configCache[monsterType] = loadedConfig;
-            
+
             return loadedConfig;
         }
 
@@ -77,17 +82,6 @@ namespace Vampire.RL
         /// <summary>
         /// Create RewardCalculator with custom configuration
         /// </summary>
-        public static RewardCalculator CreateCustomRewardCalculator(RewardConfig rewardConfig, MonsterRLConfig monsterConfig)
-        {
-            if (rewardConfig == null)
-                throw new System.ArgumentNullException(nameof(rewardConfig));
-            
-            if (monsterConfig == null)
-                throw new System.ArgumentNullException(nameof(monsterConfig));
-
-            return new RewardCalculator(rewardConfig, monsterConfig);
-        }
-
         /// <summary>
         /// Clear all cached calculators and configs
         /// </summary>
@@ -107,7 +101,7 @@ namespace Vampire.RL
 
             // Update config cache
             configCache[monsterType] = newConfig;
-            
+
             // Remove calculator from cache to force recreation with new config
             calculatorCache.Remove(monsterType);
         }
@@ -121,7 +115,7 @@ namespace Vampire.RL
             {
                 config.ApplyDifficultyScaling(difficultyMultiplier);
             }
-            
+
             // Clear calculator cache to force recreation with scaled configs
             calculatorCache.Clear();
         }
@@ -156,29 +150,6 @@ namespace Vampire.RL
                 }
             }
             return true;
-        }
-
-        /// <summary>
-        /// Create reward calculator with reward shaping disabled
-        /// </summary>
-        public static RewardCalculator CreateBasicRewardCalculator(MonsterType monsterType, MonsterRLConfig monsterConfig = null)
-        {
-            RewardConfig config = GetRewardConfig(monsterType);
-            
-            // Create a copy with shaping disabled
-            RewardConfig basicConfig = Object.Instantiate(config);
-            basicConfig.rewardFunctionType = RewardFunctionType.Dense; // Use dense but no shaping
-            basicConfig.optimalDistanceReward = 0f;
-            basicConfig.healthMaintenanceReward = 0f;
-            basicConfig.positionImprovementReward = 0f;
-            basicConfig.recentDamageBonus = 0f;
-            
-            if (monsterConfig == null)
-            {
-                monsterConfig = MonsterRLConfig.CreateDefault(monsterType);
-            }
-
-            return new RewardCalculator(basicConfig, monsterConfig);
         }
     }
 }
