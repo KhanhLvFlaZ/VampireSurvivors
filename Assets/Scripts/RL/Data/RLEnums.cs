@@ -70,4 +70,15 @@ namespace Vampire.RL
         Shaped = 2,     // Carefully designed reward shaping
         Curiosity = 3   // Intrinsic motivation based rewards
     }
+
+    /// <summary>
+    /// Reward component types for RL monsters
+    /// </summary>
+    public enum RewardType
+    {
+        Damage = 0,        // Damage dealt to enemies
+        Survival = 1,      // Monster survival duration
+        Cooperation = 2,   // Team coordination effectiveness
+        Positioning = 3    // Optimal positioning scores
+    }
 }
