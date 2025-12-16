@@ -1,0 +1,59 @@
+@startuml
+!pragma charset UTF-8
+skinparam style strictuml
+skinparam shadowing false
+skinparam ActivityFontName Arial
+skinparam ActivityFontSize 11
+
+title Tính Phần Thưởng (Reward Calculation) - Activity Diagram
+
+start
+
+:Nhận state và action
+(s, a, s', actionResult);
+
+group "1. Thu thập Metrics"
+  :Thu thập dữ liệu
+  - Sát thương (gây/nhận)
+  - Khoảng cách (deltaDistance)
+  - Thời gian sống (timeAlive)
+  - Mục tiêu (attack success, target reached);
+end group
+
+group "2. Tính Reward Components"
+  :r_damage = damageDeltToPlayer × w_damage;
+  :r_distance = deltaDistance × w_distance;
+  :r_survival = deltaTimeAlive × w_survival;
+  :r_objective = bonuses (attack/special/target);
+end group
+
+group "3. Tính Penalties"
+  :p_damage_taken = damageTaken × w_penalty;
+  :p_inactivity = idle penalty (nếu xa player);
+  :p_death = death penalty (nếu chết);
+end group
+
+group "4. Kết hợp & Shaping"
+  :rawReward = rewards - penalties;
+  :shapedReward = rawReward + Φ(s') - Φ(s);
+end group
+
+group "5. Chuẩn hóa & Return"
+  :normalizedReward = shapedReward / factor;
+  :Clip vào khoảng cho phép;
+  :Return finalReward;
+end group
+
+stop
+
+note right
+  **Công thức:**
+  R = w₁×r_damage + w₂×r_distance 
+    + w₃×r_survival + w₄×r_objective
+    - penalties + shaping
+  
+  **Weights:** damage(10), distance(1),
+  survival(0.1), penalties(5, 0.5, 100)
+end note
+
+@enduml

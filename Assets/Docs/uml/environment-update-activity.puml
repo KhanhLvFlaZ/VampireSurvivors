@@ -1,0 +1,116 @@
+@startuml
+!pragma charset UTF-8
+skinparam style strictuml
+skinparam shadowing false
+skinparam ActivityFontName Arial
+skinparam ActivityFontSize 11
+
+title Cập nhật Trạng thái Môi trường - Activity Diagram
+
+start
+
+:Nhận input Action\nfrom Actor/Monster
+- actionType: Move/Attack/Special/Idle
+- direction: Vector2
+- intensity: 0..1;
+
+' 1) Áp dụng Action
+group "1. Áp dụng Action"
+  if (actionType == Move?) then (yes)
+    :Apply movement intent
+    - set desiredVelocity
+    - update transform target;
+  else (no)
+    if (actionType == Attack/Special?) then (yes)
+      :Trigger attack logic
+      - create hitbox/projectile
+      - start cooldown;
+    else (no)
+      :Idle / Maintain state;
+    endif
+  endif
+end group
+
+' 2) Cập nhật Physics & Animation
+group "2. Cập nhật Physics & Animation"
+  :Physics2D step
+  - Rigidbody2D integration
+  - Colliders broadphase/narrowphase;
+  :Update Animator
+  - set speed/attack flags
+  - play transitions/SFX;
+end group
+
+' 3) Phát sinh Sự kiện (Hit / Drop)
+group "3. Phát sinh Sự kiện (Hit / Drop)"
+  :Check collisions
+  - Hit Player?
+  - Hit Environment/Obstacle?
+  - Projectile impacts?;
+  if (Có va chạm hợp lệ?) then (yes)
+    :Resolve hit
+    - Calculate damage/knockback
+    - Apply health change
+    - Spawn damage text/FX
+    - Raise OnHit/OnDamage events;
+  else (no)
+    :No-op;
+  endif
+
+  :Evaluate deaths (monsters/projectiles);
+  if (Có đối tượng chết?) then (yes)
+    :Handle death pipeline
+    - Despawn entity (pool)
+    - Update stats (kills)
+    - Roll loot table;
+    if (Drop item?) then (yes)
+      :Spawn collectable
+      - ExpGem / Coin / Chest
+      - Register magnetic collectable;
+    else (no)
+      :Skip drop;
+    endif
+  else (no)
+    :Continue;
+  endif
+end group
+
+' 4) Cập nhật Môi trường
+group "4. Cập nhật Môi trường"
+  :EntityManager
+  - Update spatial hash grid
+  - Insert/Update/Remove clients;
+  :Rebuild grid if player near edge;
+  :Broadcast state updates
+  - OnMonsterRegistered/Unregistered
+  - OnEnvironmentChanged;
+end group
+
+' 5) Tích hợp RL (nếu bật)
+group "5. Tích hợp RL (Optional)"
+  :RLEnvironmentManager.CaptureGameState();
+  :RewardCalculator.CalculateReward() (nếu training);
+  if (Training mode?) then (yes)
+    :ExperienceManager.Store(s, a, r, s');
+  else (no)
+    :Only record metrics;
+  endif
+end group
+
+' 6) Logging & Monitoring
+group "6. Logging & Monitoring"
+  :PerformanceMonitor.RecordFrameMetrics()
+  - frame time, memory, inference latency;
+end group
+
+stop
+
+note right
+  Thành phần liên quan:
+  • EntityManager: pooling, grid, spawn/despawn
+  • Physics2D/Animator: cập nhật vật lý & hoạt ảnh
+  • RewardCalculator/RLEnvironmentManager (tùy chọn)
+  • StatsManager/Inventory: thống kê & vật phẩm rơi
+end note
+
+@enduml
