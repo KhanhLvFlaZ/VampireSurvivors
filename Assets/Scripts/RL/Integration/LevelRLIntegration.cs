@@ -33,6 +33,7 @@ namespace Vampire.RL.Integration
         private IBehaviorProfileManager behaviorProfileManager;
         private List<RLMonster> activRLMonsters;
         private PerformanceMonitor performanceMonitor;
+        private EpisodeMetricsRecorder metricsRecorder;
         private bool isInitialized = false;
         private float timeSinceLastUpdate = 0f;
 
@@ -105,6 +106,17 @@ namespace Vampire.RL.Integration
                     performanceMonitor = pmGO.AddComponent<PerformanceMonitor>();
                 }
 
+                // Initialize metrics recorder
+                metricsRecorder = GetComponent<EpisodeMetricsRecorder>();
+                if (metricsRecorder == null)
+                {
+                    var metricsGO = new GameObject("EpisodeMetricsRecorder");
+                    metricsGO.transform.SetParent(transform);
+                    metricsRecorder = metricsGO.AddComponent<EpisodeMetricsRecorder>();
+                }
+                metricsRecorder.Initialize(performanceMonitor);
+                metricsRecorder.StartRun(UnityEngine.Random.Range(int.MinValue, int.MaxValue), levelTrainingMode.ToString());
+
                 isInitialized = true;
                 OnRLInitialized?.Invoke();
 
@@ -168,6 +180,15 @@ namespace Vampire.RL.Integration
         }
 
         /// <summary>
+        /// External hook: call when an RL monster is killed to update metrics.
+        /// </summary>
+        public void NotifyMonsterKilled()
+        {
+            metricsRecorder?.AddKill();
+            OnRLMonsterKilled?.Invoke(activRLMonsters.Count);
+        }
+
+        /// <summary>
         /// Update all RL components
         /// Requirements: 2.1, 5.1, 5.2
         /// </summary>
@@ -193,6 +214,9 @@ namespace Vampire.RL.Integration
                 {
                     // Performance monitoring is handled by PerformanceMonitor component
                 }
+
+                // Metrics sampling
+                metricsRecorder?.AddKill(0); // keep runtime update alive; actual kills increment elsewhere
 
                 // Clean up dead RL monsters
                 activRLMonsters.RemoveAll(m => m == null || !m.gameObject.activeSelf);
@@ -266,6 +290,14 @@ namespace Vampire.RL.Integration
                     }
                 }
 
+                // Finalize metrics
+                if (metricsRecorder != null)
+                {
+                    var snapshot = metricsRecorder.FinishRun();
+                    Debug.Log($"[RL Metrics] Run {snapshot.runId} seed={snapshot.seed} duration={snapshot.survivalSeconds:F1}s kills={snapshot.kills} xp={snapshot.xpGained} gold={snapshot.goldGained}");
+                    // Hook: serialize snapshot to file/telemetry here if needed
+                }
+
                 // Clear RL monsters
                 activRLMonsters.Clear();
 
@@ -286,6 +318,32 @@ namespace Vampire.RL.Integration
             {
                 ShutdownRL();
             }
+        }
+
+        // --- Public metric hooks ---
+
+        /// <summary>
+        /// Add XP gained to current run metrics.
+        /// </summary>
+        public void AddXpGained(float amount)
+        {
+            metricsRecorder?.AddXp(amount);
+        }
+
+        /// <summary>
+        /// Add gold gained to current run metrics.
+        /// </summary>
+        public void AddGoldGained(float amount)
+        {
+            metricsRecorder?.AddGold(amount);
+        }
+
+        /// <summary>
+        /// Record a drop for histogram consistency checks.
+        /// </summary>
+        public void AddDrop(string dropType)
+        {
+            metricsRecorder?.AddDrop(dropType);
         }
     }
 

@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using Vampire;
+using Vampire.RL.Training;
 
 namespace Vampire.RL
 {
@@ -16,12 +17,12 @@ namespace Vampire.RL
         [SerializeField] private TrainingMode defaultTrainingMode = TrainingMode.Training;
         [SerializeField] private float maxFrameTimeMs = 16f; // Max 16ms per frame for 60 FPS
         [SerializeField] private int maxMemoryUsageMB = 100; // Max 100MB for RL components
-        
+
         [Header("Network Settings")]
         [SerializeField] private NetworkArchitecture defaultArchitecture = NetworkArchitecture.Simple;
         [SerializeField] private int[] defaultHiddenLayers = new int[] { 64, 32 };
         [SerializeField] private LearningAlgorithm defaultAlgorithm = LearningAlgorithm.DQN;
-        
+
         [Header("Dependencies")]
         [SerializeField] private MonoBehaviour playerCharacter;
 
@@ -32,12 +33,13 @@ namespace Vampire.RL
         private Dictionary<MonsterType, ILearningAgent> agentTemplates;
         private PerformanceMonitor performanceMonitor;
         private PerformanceOptimizationManager optimizationManager;
-        
+        private TrainingMetricsLogger metricsLogger;
+
         // Performance monitoring
         private float frameStartTime;
         private float totalRLProcessingTime;
         private int activeAgentCount;
-        
+
         // System state
         private bool isInitialized = false;
         private string currentPlayerProfileId;
@@ -60,10 +62,39 @@ namespace Vampire.RL
             InitializeComponents();
             InitializeActionSpaces();
             InitializeAgentTemplates();
-            
+            InitializeMetricsLogger();
+
             isInitialized = true;
-            
+
             Debug.Log($"RL System initialized with training mode: {defaultTrainingMode}");
+        }
+
+        private void InitializeMetricsLogger()
+        {
+            try
+            {
+                var loggerGO = new GameObject("TrainingMetricsLogger");
+                loggerGO.transform.SetParent(transform);
+                metricsLogger = loggerGO.AddComponent<TrainingMetricsLogger>();
+
+                var config = new TrainingConfig
+                {
+                    learningRate = 0.001f,
+                    batchSize = 32,
+                    discountFactor = 0.99f,
+                    entropyBonus = 0.01f,
+                    algorithm = defaultAlgorithm.ToString(),
+                    networkArchitecture = defaultArchitecture.ToString()
+                };
+
+                metricsLogger.Initialize(UnityEngine.Random.Range(int.MinValue, int.MaxValue), config);
+                Debug.Log("Training metrics logger initialized");
+            }
+            catch (Exception ex)
+            {
+                ErrorHandler.LogError("RLSystem", "InitializeMetricsLogger", ex);
+                Debug.LogWarning("Failed to initialize metrics logger; continuing without logging");
+            }
         }
 
         private void InitializeComponents()
@@ -74,12 +105,12 @@ namespace Vampire.RL
                 var monitorGO = new GameObject("PerformanceMonitor");
                 monitorGO.transform.SetParent(transform);
                 performanceMonitor = monitorGO.AddComponent<PerformanceMonitor>();
-                
+
                 // Initialize performance optimization manager
                 var optimizationGO = new GameObject("PerformanceOptimizationManager");
                 optimizationGO.transform.SetParent(transform);
                 optimizationManager = optimizationGO.AddComponent<PerformanceOptimizationManager>();
-                
+
                 // Initialize training coordinator
                 var coordinatorGO = new GameObject("TrainingCoordinator");
                 coordinatorGO.transform.SetParent(transform);
@@ -90,37 +121,37 @@ namespace Vampire.RL
                 // Initialize profile manager
                 profileManager = new BehaviorProfileManager();
                 profileManager.Initialize(currentPlayerProfileId);
-                
+
                 Debug.Log("RL System components initialized successfully");
             }
             catch (Exception ex)
             {
                 ErrorHandler.LogError("RLSystem", "InitializeComponents", ex);
-                
+
                 // Try to continue with fallback components
                 InitializeFallbackComponents();
             }
         }
-        
+
         private void InitializeFallbackComponents()
         {
             try
             {
                 Debug.LogWarning("[RL FALLBACK] Initializing fallback components due to initialization failure");
-                
+
                 // Create minimal profile manager
                 if (profileManager == null)
                 {
                     profileManager = new BehaviorProfileManager();
                     profileManager.Initialize(currentPlayerProfileId ?? "fallback");
                 }
-                
+
                 // Performance monitor is optional for fallback mode
                 if (performanceMonitor == null)
                 {
                     Debug.LogWarning("[RL FALLBACK] Performance monitoring disabled");
                 }
-                
+
                 Debug.Log("[RL FALLBACK] Fallback components initialized");
             }
             catch (Exception ex)
@@ -130,17 +161,15 @@ namespace Vampire.RL
             }
         }
 
-
-
         private void InitializeActionSpaces()
         {
             actionSpaces = new Dictionary<MonsterType, ActionSpace>();
-            
+
             // Initialize action spaces using MonsterRLConfig
             foreach (MonsterType monsterType in System.Enum.GetValues(typeof(MonsterType)))
             {
                 if (monsterType == MonsterType.None) continue;
-                
+
                 var config = MonsterRLConfig.CreateDefault(monsterType);
                 actionSpaces[monsterType] = config.actionSpace;
             }
@@ -149,18 +178,18 @@ namespace Vampire.RL
         private void InitializeAgentTemplates()
         {
             agentTemplates = new Dictionary<MonsterType, ILearningAgent>();
-            
+
             foreach (var monsterType in System.Enum.GetValues(typeof(MonsterType)))
             {
                 if ((MonsterType)monsterType == MonsterType.None) continue;
-                
+
                 var agentGO = new GameObject($"AgentTemplate_{monsterType}");
                 agentGO.transform.SetParent(transform);
                 agentGO.SetActive(false); // Templates are inactive
-                
+
                 var agent = agentGO.AddComponent<DQNLearningAgent>();
                 agent.Initialize((MonsterType)monsterType, actionSpaces[(MonsterType)monsterType]);
-                
+
                 agentTemplates[(MonsterType)monsterType] = agent;
             }
         }
@@ -172,7 +201,7 @@ namespace Vampire.RL
         {
             if (!IsEnabled || !actionSpaces.ContainsKey(monsterType))
                 return null;
-                
+
             return ActionDecoderFactory.CreateDecoder(monsterType, actionSpaces[monsterType]);
         }
 
@@ -189,7 +218,7 @@ namespace Vampire.RL
             if (!IsEnabled) return;
 
             frameStartTime = Time.realtimeSinceStartup;
-            
+
             try
             {
                 // Update training coordinator
@@ -199,10 +228,10 @@ namespace Vampire.RL
             {
                 ErrorHandler.LogError("RLSystem", "UpdateAgents", ex);
             }
-            
+
             // Monitor performance
             totalRLProcessingTime = (Time.realtimeSinceStartup - frameStartTime) * 1000f; // Convert to ms
-            
+
             // Update performance monitor
             if (performanceMonitor != null)
             {
@@ -210,11 +239,11 @@ namespace Vampire.RL
                 performanceMonitor.UpdateSystemMetrics(totalRLProcessingTime, memoryUsage, activeAgentCount);
                 performanceMonitor.RecordComponentPerformance("RLSystem", totalRLProcessingTime);
             }
-            
+
             // Check performance constraints and apply degradation if needed
             if (totalRLProcessingTime > maxFrameTimeMs)
             {
-                ErrorHandler.LogPerformanceIssue("RLSystem", "FrameTime", totalRLProcessingTime, maxFrameTimeMs, 
+                ErrorHandler.LogPerformanceIssue("RLSystem", "FrameTime", totalRLProcessingTime, maxFrameTimeMs,
                     "Consider reducing batch size or limiting agents per frame");
             }
         }
@@ -237,10 +266,10 @@ namespace Vampire.RL
                 }
 
                 var agentGO = new GameObject($"LearningAgent_{monsterType}_{System.Guid.NewGuid()}");
-                
+
                 var newAgent = agentGO.AddComponent<DQNLearningAgent>();
                 newAgent.Initialize(monsterType, actionSpaces[monsterType]);
-                
+
                 // Load existing behavior profile if available
                 var profile = profileManager?.LoadProfile(monsterType);
                 if (profile != null && profile.IsValid())
@@ -260,12 +289,12 @@ namespace Vampire.RL
             catch (Exception ex)
             {
                 ErrorHandler.LogError("RLSystem", "CreateAgentForMonster", ex, monsterType.ToString());
-                
+
                 // Try to recover with fallback agent
                 return ErrorHandler.RecoverFailedAgent(monsterType, actionSpaces[monsterType], ex) ?? CreateFallbackAgent(monsterType);
             }
         }
-        
+
         private ILearningAgent CreateFallbackAgent(MonsterType monsterType)
         {
             try
@@ -273,10 +302,10 @@ namespace Vampire.RL
                 var fallbackGO = new GameObject($"FallbackAgent_{monsterType}_{System.Guid.NewGuid()}");
                 var fallbackAgent = fallbackGO.AddComponent<FallbackLearningAgent>();
                 fallbackAgent.Initialize(monsterType, actionSpaces[monsterType]);
-                
+
                 activeAgentCount++;
                 Debug.Log($"[RL FALLBACK] Created fallback agent for {monsterType}");
-                
+
                 return fallbackAgent;
             }
             catch (Exception ex)
@@ -292,7 +321,7 @@ namespace Vampire.RL
         public void RegisterAgent(ILearningAgent agent, MonsterType monsterType)
         {
             if (!IsEnabled || agent == null) return;
-            
+
             trainingCoordinator?.RegisterAgent(agent, monsterType);
         }
 
@@ -302,7 +331,7 @@ namespace Vampire.RL
         public void UnregisterAgent(ILearningAgent agent)
         {
             if (agent == null) return;
-            
+
             trainingCoordinator?.UnregisterAgent(agent);
         }
 
@@ -363,6 +392,15 @@ namespace Vampire.RL
         }
 
         /// <summary>
+        /// Get profile path from BehaviorProfile
+        /// </summary>
+        private string GetProfilePath(BehaviorProfile profile)
+        {
+            if (profile == null) return "";
+            return $"{profileManager?.ProfileDirectory ?? "Profiles"}/{profile.profileId}.json";
+        }
+
+        /// <summary>
         /// Get action space for monster type
         /// </summary>
         public ActionSpace GetActionSpace(MonsterType monsterType)
@@ -370,17 +408,42 @@ namespace Vampire.RL
             return actionSpaces.ContainsKey(monsterType) ? actionSpaces[monsterType] : ActionSpace.CreateDefault();
         }
 
-        private string GetProfilePath(BehaviorProfile profile)
+        /// <summary>
+        /// Log step metrics for training (milli-call: cheap logging)
+        /// </summary>
+        public void LogTrainingStep(float reward, float loss, int activeAgents)
         {
-            return $"{profileManager.ProfileDirectory}/{profile.profileId}.json";
+            metricsLogger?.LogStep(reward, loss, activeAgents);
         }
 
         /// <summary>
+        /// Log episode metrics completion
+        /// </summary>
+        public void LogEpisodeComplete(float episodeReward, float episodeLength, Dictionary<MonsterType, LearningMetrics> metrics)
+        {
+            metricsLogger?.LogEpisode(episodeReward, episodeLength, metrics);
+        }
+
+        /// <summary>
+        /// Log evaluation run results
+        /// </summary>
+        public void LogEvaluation(float evalReward, float survivalSeconds, int kills, float avgFps, float p99FrameTime)
+        {
+            metricsLogger?.LogEvaluation(evalReward, survivalSeconds, kills, avgFps, p99FrameTime);
+        }
+
+        /// <summary>
+        /// Export all collected training metrics
+        /// </summary>
+        public void ExportTrainingMetrics()
+        {
+            metricsLogger?.ExportMetrics();
+        }
         /// Check if system meets performance constraints
         /// </summary>
         public bool MeetsPerformanceConstraints()
         {
-            return totalRLProcessingTime <= maxFrameTimeMs && 
+            return totalRLProcessingTime <= maxFrameTimeMs &&
                    GetMemoryUsageMB() <= maxMemoryUsageMB;
         }
 
@@ -406,10 +469,10 @@ namespace Vampire.RL
         public string GetOptimizationStatus()
         {
             if (optimizationManager == null) return "Optimization Manager not initialized";
-            
+
             var report = optimizationManager.GetPerformanceReport();
             if (report?.currentSnapshot == null) return "No performance data available";
-            
+
             return $"Strategy: {report.optimizationStrategy}, " +
                    $"Frame Time: {report.currentSnapshot.frameTimeMs:F1}ms, " +
                    $"Memory: {report.currentSnapshot.memoryUsageMB:F1}MB, " +
@@ -426,15 +489,16 @@ namespace Vampire.RL
 
 
 
-        void OnDestroy()
+        private void OnDestroy()
         {
             if (isInitialized)
             {
+                ExportTrainingMetrics();
                 SaveAllProfiles();
             }
         }
 
-        void OnApplicationPause(bool pauseStatus)
+        private void OnApplicationPause(bool pauseStatus)
         {
             if (!pauseStatus && isInitialized)
             {
@@ -442,7 +506,7 @@ namespace Vampire.RL
             }
         }
 
-        void OnApplicationFocus(bool hasFocus)
+        private void OnApplicationFocus(bool hasFocus)
         {
             if (!hasFocus && isInitialized)
             {
