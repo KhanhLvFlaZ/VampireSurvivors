@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Vampire;
 using Vampire.RL;
+using Vampire.RL.Training;
 
 namespace Vampire.RL.Integration
 {
@@ -34,6 +35,7 @@ namespace Vampire.RL.Integration
         private List<RLMonster> activRLMonsters;
         private PerformanceMonitor performanceMonitor;
         private EpisodeMetricsRecorder metricsRecorder;
+        private EvaluationScenarioManager evaluationManager;
         private bool isInitialized = false;
         private float timeSinceLastUpdate = 0f;
 
@@ -116,6 +118,16 @@ namespace Vampire.RL.Integration
                 }
                 metricsRecorder.Initialize(performanceMonitor);
                 metricsRecorder.StartRun(UnityEngine.Random.Range(int.MinValue, int.MaxValue), levelTrainingMode.ToString());
+
+                // Initialize evaluation scenario manager
+                evaluationManager = GetComponent<EvaluationScenarioManager>();
+                if (evaluationManager == null)
+                {
+                    var evalGO = new GameObject("EvaluationScenarioManager");
+                    evalGO.transform.SetParent(transform);
+                    evaluationManager = evalGO.AddComponent<EvaluationScenarioManager>();
+                }
+                evaluationManager.Initialize(this, metricsRecorder);
 
                 isInitialized = true;
                 OnRLInitialized?.Invoke();
@@ -344,6 +356,30 @@ namespace Vampire.RL.Integration
         public void AddDrop(string dropType)
         {
             metricsRecorder?.AddDrop(dropType);
+        }
+
+        /// <summary>
+        /// Run a specific evaluation scenario by index.
+        /// </summary>
+        public void RunEvaluationScenario(int scenarioIndex)
+        {
+            evaluationManager?.RunScenario(scenarioIndex);
+        }
+
+        /// <summary>
+        /// Run all evaluation scenarios in sequence.
+        /// </summary>
+        public void RunAllEvaluationScenarios()
+        {
+            evaluationManager?.RunAllScenarios();
+        }
+
+        /// <summary>
+        /// Get evaluation results collected so far.
+        /// </summary>
+        public List<Training.EvaluationResult> GetEvaluationResults()
+        {
+            return evaluationManager != null ? evaluationManager.GetResults() : new List<Training.EvaluationResult>();
         }
     }
 

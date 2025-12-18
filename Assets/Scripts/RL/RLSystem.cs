@@ -34,6 +34,8 @@ namespace Vampire.RL
         private PerformanceMonitor performanceMonitor;
         private PerformanceOptimizationManager optimizationManager;
         private TrainingMetricsLogger metricsLogger;
+        private CheckpointManager checkpointManager;
+        private TrainingController trainingController;
 
         // Performance monitoring
         private float frameStartTime;
@@ -121,6 +123,17 @@ namespace Vampire.RL
                 // Initialize profile manager
                 profileManager = new BehaviorProfileManager();
                 profileManager.Initialize(currentPlayerProfileId);
+
+                // Initialize checkpoint manager
+                var checkpointGO = new GameObject("CheckpointManager");
+                checkpointGO.transform.SetParent(transform);
+                checkpointManager = checkpointGO.AddComponent<CheckpointManager>();
+                checkpointManager.Initialize();
+
+                // Initialize training controller
+                var trainingGO = new GameObject("TrainingController");
+                trainingGO.transform.SetParent(transform);
+                trainingController = trainingGO.AddComponent<TrainingController>();
 
                 Debug.Log("RL System components initialized successfully");
             }
@@ -438,6 +451,62 @@ namespace Vampire.RL
         public void ExportTrainingMetrics()
         {
             metricsLogger?.ExportMetrics();
+        }
+
+        /// <summary>
+        /// Start training loop (50k-200k episodes with periodic eval).
+        /// </summary>
+        public void StartTraining(int totalEpisodes = 100000, int evalIntervalSteps = 10000)
+        {
+            if (trainingController == null)
+            {
+                Debug.LogError("Training controller not initialized");
+                return;
+            }
+
+            trainingController.SetTotalEpisodes(totalEpisodes);
+            trainingController.SetEvaluationInterval(evalIntervalSteps);
+            trainingController.StartTraining();
+        }
+
+        /// <summary>
+        /// Pause training loop.
+        /// </summary>
+        public void PauseTraining()
+        {
+            trainingController?.PauseTraining();
+        }
+
+        /// <summary>
+        /// Resume paused training.
+        /// </summary>
+        public void ResumeTraining()
+        {
+            trainingController?.ResumeTraining();
+        }
+
+        /// <summary>
+        /// Get current training progress (0-1).
+        /// </summary>
+        public float GetTrainingProgress()
+        {
+            return trainingController != null ? trainingController.GetTrainingProgress() : 0f;
+        }
+
+        /// <summary>
+        /// Get current episode count.
+        /// </summary>
+        public int GetCurrentEpisode()
+        {
+            return trainingController != null ? trainingController.CurrentEpisode : 0;
+        }
+
+        /// <summary>
+        /// Get best checkpoint metadata.
+        /// </summary>
+        public CheckpointMetadata GetBestCheckpoint()
+        {
+            return checkpointManager != null ? checkpointManager.GetBestCheckpoint() : null;
         }
         /// Check if system meets performance constraints
         /// </summary>
