@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Tích hợp hệ thống học tăng cường (Reinforcement Learning) cho monster trong game để tạo ra hành vi thông minh và thích ứng. Monster sẽ học cách tối ưu hóa chiến thuật tấn công, di chuyển và phối hợp dựa trên phản hồi từ môi trường game, tạo ra trải nghiệm thử thách và thú vị hơn cho người chơi.
+Tích hợp hệ thống học tăng cường (Reinforcement Learning) đa agent cho quái trong game sinh tồn thể loại Survivors với chế độ Co-op, nhằm tạo hành vi thông minh, thích ứng và phối hợp trước nhiều người chơi. Monster học tối ưu hóa chiến thuật tấn công, di chuyển, chia aggro và hỗ trợ nhau dựa trên phản hồi từ môi trường và chiến thuật của đội người chơi, mang lại thử thách nhưng vẫn công bằng.
 
 ## Glossary
 
@@ -63,8 +63,9 @@ Tích hợp hệ thống học tăng cường (Reinforcement Learning) cho monst
 1. WHEN Monster_Agent gây damage cho player THEN Reward_System SHALL cung cấp positive reward proportional với damage dealt
 2. WHEN Monster_Agent bị tiêu diệt THEN Reward_System SHALL áp dụng negative reward dựa trên survival time
 3. WHEN Monster_Agent phối hợp với monsters khác THEN Reward_System SHALL reward cooperative behaviors
-4. WHEN Monster_Agent sử dụng environment effectively THEN Reward_System SHALL reward tactical positioning
-5. WHEN reward parameters được điều chỉnh THEN Reward_System SHALL update reward calculation trong runtime
+4. WHEN Monster_Agent hỗ trợ đồng đội (assist/aggro share/heal/buff) THEN Reward_System SHALL cấp reward chia sẻ theo đóng góp
+5. WHEN Monster_Agent duy trì đội hình/spacing tối ưu THEN Reward_System SHALL reward tactical positioning và tránh friendly-fire
+6. WHEN reward parameters được điều chỉnh THEN Reward_System SHALL update reward calculation trong runtime
 
 ### Requirement 5
 

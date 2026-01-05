@@ -13,6 +13,8 @@ namespace Vampire.RL
     {
         [Header("Reward Configuration")]
         [SerializeField] private object rewardComponents;
+        [SerializeField] private bool enableCoopRewards = false;
+        [SerializeField] private CoopRewardCalculator coopRewardCalculator;
 
         [Header("Reward Shaping Parameters")]
         [SerializeField] private float distanceRewardScale = 1.0f;
@@ -51,6 +53,13 @@ namespace Vampire.RL
             this.environment = environment;
             this.entityManager = entityManager;
             this.playerCharacter = playerCharacter;
+
+            // Initialize co-op reward calculator if enabled
+            if (enableCoopRewards && coopRewardCalculator != null)
+            {
+                coopRewardCalculator.Initialize(environment, entityManager);
+                Debug.Log("Co-op reward calculator initialized");
+            }
         }
 
         /// <summary>
@@ -74,6 +83,13 @@ namespace Vampire.RL
             totalReward += survivalReward;
             totalReward += coordinationReward;
             totalReward += positioningReward;
+
+            // Add co-op rewards if enabled
+            if (enableCoopRewards && coopRewardCalculator != null)
+            {
+                float coopReward = coopRewardCalculator.CalculateReward(monster, action, previousState);
+                totalReward += coopReward;
+            }
 
             // Apply reward shaping
             totalReward = ApplyRewardShaping(totalReward, monster, previousState);
@@ -99,6 +115,13 @@ namespace Vampire.RL
             {
                 // Reward calculation based on action outcome
                 totalReward = actionOutcome.damageDealt * 10f; // damageDealtReward
+            }
+
+            // Add co-op rewards if enabled
+            if (enableCoopRewards && coopRewardCalculator != null)
+            {
+                float coopReward = coopRewardCalculator.CalculateReward(previousState, action, currentState, actionOutcome);
+                totalReward += coopReward;
             }
 
             return totalReward;
@@ -310,6 +333,12 @@ namespace Vampire.RL
             lastDamageDealt.Remove(monster);
             lastPositions.Remove(monster);
             lastDistances.Remove(monster);
+
+            // Cleanup co-op tracking if enabled
+            if (enableCoopRewards && coopRewardCalculator != null)
+            {
+                coopRewardCalculator.CleanupMonster(monster);
+            }
         }
 
         /// <summary>

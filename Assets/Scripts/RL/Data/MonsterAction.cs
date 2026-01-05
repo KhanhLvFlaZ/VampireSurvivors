@@ -112,6 +112,7 @@ namespace Vampire.RL
         public float damageTaken;
         public bool coordinated; // Successfully coordinated with other monsters
         public float distanceToPlayer; // Final distance to player after action
+        public bool targetKilled; // Whether the target (enemy/monster) was killed
 
         public static ActionOutcome CreateDefault()
         {
@@ -122,7 +123,8 @@ namespace Vampire.RL
                 tookDamage = false,
                 damageTaken = 0f,
                 coordinated = false,
-                distanceToPlayer = float.MaxValue
+                distanceToPlayer = float.MaxValue,
+                targetKilled = false
             };
         }
     }

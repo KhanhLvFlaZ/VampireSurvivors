@@ -6,7 +6,8 @@
     "Unity.TextMeshPro",
     "Unity.ML-Agents",
     "Unity.ML-Agents.Extensions",
-    "Assembly-CSharp"
+    "Assembly-CSharp",
+    "Unity.InputSystem"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

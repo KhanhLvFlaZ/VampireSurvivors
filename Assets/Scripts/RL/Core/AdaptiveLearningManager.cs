@@ -141,6 +141,15 @@ namespace Vampire.RL
                             strategyDetector.GetStrategiesByConfidence().Count > 0
                             ? strategyDetector.GetStrategiesByConfidence()[0].confidence
                             : 0f;
+
+                        if (result.strategyConfidence < strategyConfidenceThreshold)
+                        {
+                            // Confidence too low: skip adaptation this cycle
+                            result.adaptationsApplied = false;
+                            result.difficultyChanged = false;
+                            OnLearningCycleCompleted?.Invoke(result);
+                            return;
+                        }
                     }
                 }
 

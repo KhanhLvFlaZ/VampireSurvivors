@@ -1,4 +1,4 @@
-# Implementation Plan
+# Implementation Plan (Co-op Survivors RL)
 
 - [x] 1. Set up RL system foundation and core interfaces
 
@@ -13,7 +13,7 @@
   - **Property 1: Agent Initialization Consistency**
   - **Validates: Requirements 1.1**
 
-- [x] 2. Implement core RL data models and state management
+- [x] 2. Implement core RL data models and state management (multi-agent ready)
 
   - Create RLState class with environment observation data
   - Implement RLAction enum and action space definition
@@ -31,7 +31,7 @@
   - **Property 16: Damage Reward Proportionality**
   - **Validates: Requirements 4.1**
 
-- [x] 3. Create RL environment and observation system
+- [x] 3. Create RL environment and observation system (include teammate state)
 
   - Implement RLEnvironment class for state observation
   - Create environment state collection from game world
@@ -44,7 +44,7 @@
   - **Property 3: Action Execution Consistency**
   - **Validates: Requirements 1.3**
 
-- [x] 4. Implement Monster RL Agent component
+- [x] 4. Implement Monster RL Agent component (multi-agent behavior)
 
   - Create RLMonster class extending Monster base class
   - Implement IRLAgent interface with DQN algorithm
@@ -75,7 +75,7 @@
   - **Property 18: Cooperation Reward Assignment**
   - **Validates: Requirements 4.3**
 
-- [x] 6. Implement training system and model management
+- [x] 6. Implement training system and model management (supports PPO/DQN, multi-agent)
 
   - Create RLTrainingManager for offline training
   - Implement neural network model with Unity ML-Agents

@@ -100,6 +100,20 @@ namespace Vampire.RL.Training
         }
 
         /// <summary>
+        /// Auto-checkpoint helper based on step interval.
+        /// </summary>
+        public void TryAutoCheckpoint(int step, int episode, float reward, float survivalTime, string modelData = "")
+        {
+            if (!enableAutoCheckpoint || checkpointIntervalSteps <= 0)
+                return;
+
+            if (step % checkpointIntervalSteps == 0)
+            {
+                SaveCheckpoint(step, episode, reward, survivalTime, modelData);
+            }
+        }
+
+        /// <summary>
         /// Check if given metrics are better than best checkpoint.
         /// </summary>
         private bool IsBetterCheckpoint(CheckpointMetadata candidate)
@@ -139,7 +153,7 @@ namespace Vampire.RL.Training
                 {
                     string checkpointName = File.ReadAllText(bestMarkerFile).Trim();
                     string metadataFile = Path.Combine(checkpointPath, $"{checkpointName}_meta.json");
-                    
+
                     if (File.Exists(metadataFile))
                     {
                         string json = File.ReadAllText(metadataFile);
@@ -162,7 +176,7 @@ namespace Vampire.RL.Training
                 if (files.Length > maxCheckpointsToKeep)
                 {
                     // Sort by modification time (oldest first)
-                    System.Array.Sort(files, (a, b) => 
+                    System.Array.Sort(files, (a, b) =>
                         File.GetLastWriteTime(a).CompareTo(File.GetLastWriteTime(b)));
 
                     // Delete oldest

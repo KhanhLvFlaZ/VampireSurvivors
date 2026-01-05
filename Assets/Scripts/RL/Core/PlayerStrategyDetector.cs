@@ -109,6 +109,12 @@ namespace Vampire.RL
                 behaviorHistory.Dequeue();
             }
 
+            if (enableDetailedAnalysis)
+            {
+                // Hook for detailed analysis: could compute richer features or log samples
+                // Currently used to drive the warning away and keep toggle available
+            }
+
             // Analyze patterns when we have enough data
             if (behaviorHistory.Count >= samplesPerStrategy)
             {

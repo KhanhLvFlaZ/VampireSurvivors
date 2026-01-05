@@ -17,29 +17,29 @@ namespace Vampire.RL
         [SerializeField] private bool enableGroupLearning = true;
         [SerializeField] private float learningUpdateInterval = 0.5f;
         [SerializeField] private int maxConcurrentLearners = 20;
-        
+
         [Header("Type-Specific Learning Rates")]
         [SerializeField] private float meleeBaseLearningRate = 0.001f;
         [SerializeField] private float rangedBaseLearningRate = 0.0015f;
         [SerializeField] private float throwingBaseLearningRate = 0.002f;
         [SerializeField] private float boomerangBaseLearningRate = 0.0012f;
         [SerializeField] private float bossBaseLearningRate = 0.0008f;
-        
+
         // Core components
         private TrainingCoordinator trainingCoordinator;
         private MonsterCoordinationSystem coordinationSystem;
         private Dictionary<MonsterType, TypeLearningManager> typeLearningManagers;
         private Dictionary<MonsterType, List<IGroupLearningAgent>> coordinatedAgents;
-        
+
         // Learning state tracking
         private Dictionary<MonsterType, LearningProgress> typeProgress;
         private Dictionary<string, GroupLearningSession> activeLearningGroups;
         private float lastLearningUpdate;
-        
+
         // Performance monitoring
         private Dictionary<MonsterType, float> typePerformanceScores;
         private Dictionary<MonsterType, int> typeAgentCounts;
-        
+
         // Events
         public event Action<MonsterType, LearningProgress> OnTypeLearningProgressUpdated;
         public event Action<string, GroupLearningSession> OnGroupLearningSessionStarted;
@@ -62,17 +62,17 @@ namespace Vampire.RL
             activeLearningGroups = new Dictionary<string, GroupLearningSession>();
             typePerformanceScores = new Dictionary<MonsterType, float>();
             typeAgentCounts = new Dictionary<MonsterType, int>();
-            
+
             // Initialize for each monster type
             foreach (MonsterType monsterType in Enum.GetValues(typeof(MonsterType)))
             {
                 if (monsterType == MonsterType.None) continue;
-                
+
                 InitializeTypeSpecificLearning(monsterType);
             }
-            
+
             lastLearningUpdate = Time.time;
-            
+
             Debug.Log("Multi-Monster Learning Manager initialized");
         }
 
@@ -81,15 +81,35 @@ namespace Vampire.RL
             // Create type-specific learning manager
             var managerGO = new GameObject($"TypeLearningManager_{monsterType}");
             managerGO.transform.SetParent(transform);
-            
+
             var typeManager = managerGO.AddComponent<TypeLearningManager>();
             typeManager.Initialize(monsterType, maxConcurrentLearners / 5, 0.8f); // Distribute capacity
-            
+            typeManager.SetLearningRate(GetBaseLearningRate(monsterType));
+
             typeLearningManagers[monsterType] = typeManager;
             coordinatedAgents[monsterType] = new List<IGroupLearningAgent>();
             typeProgress[monsterType] = LearningProgress.CreateDefault();
             typePerformanceScores[monsterType] = 0f;
             typeAgentCounts[monsterType] = 0;
+        }
+
+        private float GetBaseLearningRate(MonsterType monsterType)
+        {
+            switch (monsterType)
+            {
+                case MonsterType.Melee:
+                    return meleeBaseLearningRate;
+                case MonsterType.Ranged:
+                    return rangedBaseLearningRate;
+                case MonsterType.Throwing:
+                    return throwingBaseLearningRate;
+                case MonsterType.Boomerang:
+                    return boomerangBaseLearningRate;
+                case MonsterType.Boss:
+                    return bossBaseLearningRate;
+                default:
+                    return meleeBaseLearningRate;
+            }
         }
 
         /// <summary>
@@ -99,7 +119,7 @@ namespace Vampire.RL
         {
             trainingCoordinator = coordinator;
             coordinationSystem = coordination;
-            
+
             // Subscribe to coordination events
             if (coordinationSystem != null)
             {
@@ -114,20 +134,20 @@ namespace Vampire.RL
         public void RegisterAgent(ILearningAgent agent, MonsterType monsterType)
         {
             if (agent == null || monsterType == MonsterType.None) return;
-            
+
             // Register with type-specific manager
             if (typeLearningManagers.ContainsKey(monsterType))
             {
                 typeLearningManagers[monsterType].RegisterAgent(agent);
                 typeAgentCounts[monsterType]++;
             }
-            
+
             // If agent supports coordination, add to coordinated agents
             if (agent is IGroupLearningAgent coordAgent)
             {
                 coordinatedAgents[monsterType].Add(coordAgent);
             }
-            
+
             Debug.Log($"Registered {monsterType} agent for multi-monster learning");
         }
 
@@ -137,43 +157,43 @@ namespace Vampire.RL
         public void UnregisterAgent(ILearningAgent agent, MonsterType monsterType)
         {
             if (agent == null || monsterType == MonsterType.None) return;
-            
+
             // Unregister from type-specific manager
             if (typeLearningManagers.ContainsKey(monsterType))
             {
                 typeLearningManagers[monsterType].UnregisterAgent(agent);
                 typeAgentCounts[monsterType] = Mathf.Max(0, typeAgentCounts[monsterType] - 1);
             }
-            
+
             // Remove from coordinated agents if applicable
             if (agent is IGroupLearningAgent coordAgent && coordinatedAgents.ContainsKey(monsterType))
             {
                 coordinatedAgents[monsterType].Remove(coordAgent);
             }
-            
+
             Debug.Log($"Unregistered {monsterType} agent from multi-monster learning");
         }
 
         void Update()
         {
             if (!IsLearningActive) return;
-            
+
             if (Time.time - lastLearningUpdate < learningUpdateInterval) return;
-            
+
             lastLearningUpdate = Time.time;
-            
+
             // Update independent learning per type
             if (enableIndependentLearning)
             {
                 UpdateIndependentLearning();
             }
-            
+
             // Update group learning sessions
             if (enableGroupLearning)
             {
                 UpdateGroupLearning();
             }
-            
+
             // Update performance tracking
             UpdatePerformanceTracking();
         }
@@ -184,7 +204,7 @@ namespace Vampire.RL
             {
                 var monsterType = kvp.Key;
                 var typeManager = kvp.Value;
-                
+
                 // Update learning for this type
                 var metrics = typeManager.UpdateLearning();
                 if (metrics.episodeCount > 0)
@@ -193,7 +213,7 @@ namespace Vampire.RL
                     var progress = typeProgress[monsterType];
                     progress.UpdateFromMetrics(metrics);
                     typeProgress[monsterType] = progress;
-                    
+
                     OnTypeLearningProgressUpdated?.Invoke(monsterType, progress);
                 }
             }
@@ -203,21 +223,21 @@ namespace Vampire.RL
         {
             // Update active group learning sessions
             var completedSessions = new List<string>();
-            
+
             foreach (var kvp in activeLearningGroups)
             {
                 var sessionId = kvp.Key;
                 var session = kvp.Value;
-                
+
                 session.Update();
-                
+
                 if (session.IsCompleted)
                 {
                     completedSessions.Add(sessionId);
                     OnGroupLearningSessionCompleted?.Invoke(sessionId, session);
                 }
             }
-            
+
             // Remove completed sessions
             foreach (var sessionId in completedSessions)
             {
@@ -231,7 +251,7 @@ namespace Vampire.RL
             {
                 var progress = typeProgress[monsterType];
                 var agentCount = typeAgentCounts[monsterType];
-                
+
                 // Calculate performance score
                 float performanceScore = CalculateTypePerformanceScore(progress, agentCount);
                 typePerformanceScores[monsterType] = performanceScore;
@@ -241,19 +261,19 @@ namespace Vampire.RL
         private float CalculateTypePerformanceScore(LearningProgress progress, int agentCount)
         {
             if (agentCount == 0) return 0f;
-            
+
             // Combine multiple factors for performance score
             float learningEfficiency = progress.learningEfficiency;
             float coordinationSuccess = progress.coordinationSuccessRate;
             float adaptationRate = progress.adaptationRate;
-            
+
             return (learningEfficiency + coordinationSuccess + adaptationRate) / 3f;
         }
 
         private void OnCoordinationGroupFormed(CoordinationGroup group)
         {
             if (!enableGroupLearning) return;
-            
+
             // Start a group learning session
             var session = new GroupLearningSession
             {
@@ -263,10 +283,10 @@ namespace Vampire.RL
                 participantAgents = GetCoordinatedAgentsInGroup(group),
                 learningObjectives = DetermineLearningObjectives(group)
             };
-            
+
             activeLearningGroups[session.sessionId] = session;
             OnGroupLearningSessionStarted?.Invoke(session.sessionId, session);
-            
+
             Debug.Log($"Started group learning session for {group.monsterType} group");
         }
 
@@ -276,7 +296,7 @@ namespace Vampire.RL
             var sessionsToComplete = activeLearningGroups.Values
                 .Where(s => s.group.groupId == group.groupId)
                 .ToList();
-            
+
             foreach (var session in sessionsToComplete)
             {
                 session.CompleteSession();
@@ -288,7 +308,7 @@ namespace Vampire.RL
         private List<IGroupLearningAgent> GetCoordinatedAgentsInGroup(CoordinationGroup group)
         {
             var agents = new List<IGroupLearningAgent>();
-            
+
             if (coordinatedAgents.ContainsKey(group.monsterType))
             {
                 foreach (var agent in coordinatedAgents[group.monsterType])
@@ -299,14 +319,14 @@ namespace Vampire.RL
                     }
                 }
             }
-            
+
             return agents;
         }
 
         private List<string> DetermineLearningObjectives(CoordinationGroup group)
         {
             var objectives = new List<string>();
-            
+
             switch (group.coordinationStrategy)
             {
                 case CoordinationStrategy.Surround:
@@ -325,7 +345,7 @@ namespace Vampire.RL
                     objectives.Add("Learn basic group coordination");
                     break;
             }
-            
+
             return objectives;
         }
 
@@ -334,7 +354,7 @@ namespace Vampire.RL
         /// </summary>
         public LearningProgress GetTypeProgress(MonsterType monsterType)
         {
-            return typeProgress.ContainsKey(monsterType) ? 
+            return typeProgress.ContainsKey(monsterType) ?
                 typeProgress[monsterType] : LearningProgress.CreateDefault();
         }
 
@@ -343,7 +363,7 @@ namespace Vampire.RL
         /// </summary>
         public float GetTypePerformanceScore(MonsterType monsterType)
         {
-            return typePerformanceScores.ContainsKey(monsterType) ? 
+            return typePerformanceScores.ContainsKey(monsterType) ?
                 typePerformanceScores[monsterType] : 0f;
         }
 
@@ -352,7 +372,7 @@ namespace Vampire.RL
         /// </summary>
         public int GetAgentCount(MonsterType monsterType)
         {
-            return typeAgentCounts.ContainsKey(monsterType) ? 
+            return typeAgentCounts.ContainsKey(monsterType) ?
                 typeAgentCounts[monsterType] : 0;
         }
 
@@ -365,15 +385,15 @@ namespace Vampire.RL
             {
                 typeManager.ResetProgress();
             }
-            
+
             foreach (var monsterType in typeProgress.Keys.ToList())
             {
                 typeProgress[monsterType] = LearningProgress.CreateDefault();
                 typePerformanceScores[monsterType] = 0f;
             }
-            
+
             activeLearningGroups.Clear();
-            
+
             Debug.Log("Reset all multi-monster learning progress");
         }
 
@@ -385,7 +405,7 @@ namespace Vampire.RL
                 coordinationSystem.OnGroupFormed -= OnCoordinationGroupFormed;
                 coordinationSystem.OnGroupDisbanded -= OnCoordinationGroupDisbanded;
             }
-            
+
             // Clean up type learning managers
             foreach (var typeManager in typeLearningManagers.Values)
             {
@@ -419,7 +439,7 @@ namespace Vampire.RL
         public int totalEpisodes;
         public float averageReward;
         public DateTime lastUpdated;
-        
+
         public static LearningProgress CreateDefault()
         {
             return new LearningProgress
@@ -432,14 +452,14 @@ namespace Vampire.RL
                 lastUpdated = DateTime.Now
             };
         }
-        
+
         public void UpdateFromMetrics(LearningMetrics metrics)
         {
             learningEfficiency = Mathf.Clamp01(metrics.averageReward / 100f);
             totalEpisodes = metrics.episodeCount;
             averageReward = metrics.averageReward;
             lastUpdated = DateTime.Now;
-            
+
             // Calculate adaptation rate based on recent performance changes
             adaptationRate = Mathf.Clamp01(1f - metrics.lossValue);
         }
@@ -458,21 +478,21 @@ namespace Vampire.RL
         public List<string> learningObjectives;
         public Dictionary<string, float> objectiveProgress;
         public bool isCompleted;
-        
+
         public float SessionDuration => Time.time - startTime;
         public bool IsCompleted => isCompleted;
-        
+
         public void Update()
         {
             if (isCompleted) return;
-            
+
             // Update objective progress
             UpdateObjectiveProgress();
-            
+
             // Check completion conditions
             CheckCompletionConditions();
         }
-        
+
         private void UpdateObjectiveProgress()
         {
             if (objectiveProgress == null)
@@ -483,7 +503,7 @@ namespace Vampire.RL
                     objectiveProgress[objective] = 0f;
                 }
             }
-            
+
             // Simulate progress based on group performance
             foreach (var objective in learningObjectives)
             {
@@ -492,23 +512,23 @@ namespace Vampire.RL
                 objectiveProgress[objective] = Mathf.Min(1f, currentProgress + progressIncrement);
             }
         }
-        
+
         private void CheckCompletionConditions()
         {
             // Complete if all objectives are sufficiently progressed or session is too long
             bool allObjectivesComplete = objectiveProgress.Values.All(progress => progress >= 0.8f);
             bool sessionTooLong = SessionDuration > 300f; // 5 minutes max
-            
+
             if (allObjectivesComplete || sessionTooLong)
             {
                 CompleteSession();
             }
         }
-        
+
         public void CompleteSession()
         {
             isCompleted = true;
-            
+
             // Apply learning results to participant agents
             foreach (var agent in participantAgents)
             {

@@ -17,6 +17,26 @@ namespace Vampire.RL
         [SerializeField] private TrainingMode defaultTrainingMode = TrainingMode.Training;
         [SerializeField] private float maxFrameTimeMs = 16f; // Max 16ms per frame for 60 FPS
         [SerializeField] private int maxMemoryUsageMB = 100; // Max 100MB for RL components
+        [Tooltip("Minimum interval between RL decision updates (seconds), caps per-frame cost when many agents are active")]
+        [SerializeField] private float decisionIntervalSeconds = 0.1f;
+        [Tooltip("Upper bound on agent updates per tick to avoid spikes")]
+        [SerializeField] private int maxAgentUpdatesPerTick = 16;
+
+        [Header("Inference Cost Control")]
+        [Tooltip("Maximum RL agents before falling back to scripted behavior")]
+        [SerializeField] private int maxRLAgents = 50;
+        [Tooltip("Target latency budget in milliseconds")]
+        [SerializeField] private float targetLatencyMs = 16f;
+        [Tooltip("Estimated inference cost per agent (ms)")]
+        [SerializeField] private float latencyPerAgentMs = 0.3f;
+        [Tooltip("Enable dynamic adjustment of max agents based on performance")]
+        [SerializeField] private bool enableDynamicLimit = true;
+        [Tooltip("Maximum batch size for inference batching")]
+        [SerializeField] private int maxBatchSize = 32;
+        [Tooltip("Batch timeout in milliseconds")]
+        [SerializeField] private float batchTimeoutMs = 5f;
+        [Tooltip("Enable inference batching")]
+        [SerializeField] private bool enableBatching = true;
 
         [Header("Network Settings")]
         [SerializeField] private NetworkArchitecture defaultArchitecture = NetworkArchitecture.Simple;
@@ -37,10 +57,15 @@ namespace Vampire.RL
         private CheckpointManager checkpointManager;
         private TrainingController trainingController;
 
+        // Inference cost control
+        private InferenceBatcher inferenceBatcher;
+        private RLSpawnLimiter spawnLimiter;
+
         // Performance monitoring
         private float frameStartTime;
         private float totalRLProcessingTime;
         private int activeAgentCount;
+        private float lastDecisionUpdateTime;
 
         // System state
         private bool isInitialized = false;
@@ -65,6 +90,7 @@ namespace Vampire.RL
             InitializeActionSpaces();
             InitializeAgentTemplates();
             InitializeMetricsLogger();
+            InitializeInferenceCostControl();
 
             isInitialized = true;
 
@@ -96,6 +122,33 @@ namespace Vampire.RL
             {
                 ErrorHandler.LogError("RLSystem", "InitializeMetricsLogger", ex);
                 Debug.LogWarning("Failed to initialize metrics logger; continuing without logging");
+            }
+        }
+
+        private void InitializeInferenceCostControl()
+        {
+            try
+            {
+                // Initialize inference batcher
+                if (enableBatching)
+                {
+                    inferenceBatcher = new InferenceBatcher(maxBatchSize, batchTimeoutMs);
+                    Debug.Log($"Inference batcher initialized (batch size: {maxBatchSize}, timeout: {batchTimeoutMs}ms)");
+                }
+
+                // Initialize spawn limiter
+                spawnLimiter = new RLSpawnLimiter(
+                    maxRLAgents,
+                    targetLatencyMs,
+                    latencyPerAgentMs,
+                    enableDynamicLimit
+                );
+                Debug.Log($"RL spawn limiter initialized (max agents: {maxRLAgents}, target latency: {targetLatencyMs}ms)");
+            }
+            catch (Exception ex)
+            {
+                ErrorHandler.LogError("RLSystem", "InitializeInferenceCostControl", ex);
+                Debug.LogWarning("Failed to initialize inference cost control; continuing with defaults");
             }
         }
 
@@ -234,8 +287,24 @@ namespace Vampire.RL
 
             try
             {
-                // Update training coordinator
-                trainingCoordinator?.UpdateAgents();
+                // Throttle decision updates to reduce per-frame spikes when many agents are active
+                if (Time.time - lastDecisionUpdateTime >= decisionIntervalSeconds)
+                {
+                    // Process batched inferences first
+                    if (enableBatching && inferenceBatcher != null)
+                    {
+                        int processed = inferenceBatcher.ProcessBatch();
+                        if (processed > 0)
+                        {
+                            // Update spawn limiter with batch processing time
+                            float batchTime = (Time.realtimeSinceStartup - frameStartTime) * 1000f;
+                            spawnLimiter?.UpdateLatency(batchTime);
+                        }
+                    }
+
+                    trainingCoordinator?.UpdateAgents();
+                    lastDecisionUpdateTime = Time.time;
+                }
             }
             catch (Exception ex)
             {
@@ -244,6 +313,12 @@ namespace Vampire.RL
 
             // Monitor performance
             totalRLProcessingTime = (Time.realtimeSinceStartup - frameStartTime) * 1000f; // Convert to ms
+
+            // Update spawn limiter with total processing time
+            if (spawnLimiter != null)
+            {
+                spawnLimiter.UpdateLatency(totalRLProcessingTime);
+            }
 
             // Update performance monitor
             if (performanceMonitor != null)
@@ -271,6 +346,17 @@ namespace Vampire.RL
 
             try
             {
+                // Check spawn limiter - fallback to scripted if at capacity
+                if (spawnLimiter != null && !spawnLimiter.CanSpawnRLAgent())
+                {
+                    spawnLimiter.RegisterScriptedFallback();
+                    var decision = spawnLimiter.GetSpawnDecision();
+                    Debug.Log($"[RL SPAWN LIMITER] Cannot spawn RL agent for {monsterType}: {decision.reason}. " +
+                             $"Active: {spawnLimiter.ActiveRLAgentCount}/{spawnLimiter.MaxRLAgents}, " +
+                             $"Fallbacks: {spawnLimiter.ScriptedFallbackCount}");
+                    return null; // Caller should use scripted behavior
+                }
+
                 // Check if we should disable this component due to repeated failures
                 if (ErrorHandler.ShouldDisableComponent($"Agent_{monsterType}"))
                 {
@@ -293,6 +379,9 @@ namespace Vampire.RL
                 // Register with training coordinator
                 trainingCoordinator?.RegisterAgent(newAgent, monsterType);
                 activeAgentCount++;
+
+                // Notify spawn limiter
+                spawnLimiter?.RegisterRLAgent();
 
                 // Reset error count on successful creation
                 ErrorHandler.ResetComponentErrors($"Agent_{monsterType}");
@@ -357,6 +446,9 @@ namespace Vampire.RL
 
             trainingCoordinator?.UnregisterAgent(agent);
             activeAgentCount = Mathf.Max(0, activeAgentCount - 1);
+
+            // Notify spawn limiter
+            spawnLimiter?.UnregisterRLAgent();
 
             if (agent is MonoBehaviour agentMono)
             {
@@ -547,6 +639,46 @@ namespace Vampire.RL
                    $"Memory: {report.currentSnapshot.memoryUsageMB:F1}MB, " +
                    $"Batch Size: {report.currentSnapshot.currentBatchSize}, " +
                    $"Emergency: {(report.emergencyModeActive ? "ACTIVE" : "Inactive")}";
+        }
+
+        /// <summary>
+        /// Check if a new RL agent can be spawned within performance budget
+        /// </summary>
+        public bool CanSpawnRLAgent()
+        {
+            return spawnLimiter?.CanSpawnRLAgent() ?? true;
+        }
+
+        /// <summary>
+        /// Get spawn limiter statistics
+        /// </summary>
+        public LimiterStats GetSpawnLimiterStats()
+        {
+            return spawnLimiter?.GetStats() ?? default;
+        }
+
+        /// <summary>
+        /// Get inference batching statistics
+        /// </summary>
+        public BatchingStats GetBatchingStats()
+        {
+            return inferenceBatcher?.GetStats() ?? default;
+        }
+
+        /// <summary>
+        /// Get comprehensive inference cost control status
+        /// </summary>
+        public string GetInferenceCostStatus()
+        {
+            if (spawnLimiter == null) return "Spawn limiter not initialized";
+
+            var limiterStats = spawnLimiter.GetStats();
+            var batchingStats = inferenceBatcher?.GetStats() ?? default;
+
+            return $"RL Agents: {limiterStats.activeRLAgents}/{limiterStats.maxRLAgents} ({limiterStats.capacityUtilization:P0}), " +
+                   $"Fallbacks: {limiterStats.scriptedFallbacks}, " +
+                   $"Latency: {limiterStats.currentLatencyMs:F1}ms (avg: {limiterStats.averageLatencyMs:F1}ms), " +
+                   $"Batching: {batchingStats.pendingRequests} pending, avg batch: {batchingStats.averageBatchSize:F1}";
         }
 
         private float GetMemoryUsageMB()

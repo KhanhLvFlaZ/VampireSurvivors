@@ -59,6 +59,10 @@ namespace Vampire.RL
             if (timeSinceLastUpdate >= updateInterval)
             {
                 UpdateDisplay();
+                if (showOnScreen)
+                {
+                    // Placeholder for on-screen UI hook; toggling prevents unused field warning
+                }
                 timeSinceLastUpdate = 0f;
             }
         }

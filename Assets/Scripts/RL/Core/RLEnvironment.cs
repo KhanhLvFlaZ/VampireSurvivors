@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using System.Collections.Generic;
 using System.Linq;
 using Vampire;
@@ -26,6 +27,7 @@ namespace Vampire.RL
         private Character playerCharacter;
         private SpatialHashGrid spatialGrid;
         private IRewardCalculator rewardCalculator;
+        [SerializeField] private Vampire.Gameplay.CoopPlayerManager coopPlayerManager;
 
         // Player behavior tracking
         private Queue<Vector2> playerPositionHistory;
@@ -38,6 +40,15 @@ namespace Vampire.RL
         private Dictionary<Monster, float> monsterEpisodeStartTimes;
         private Dictionary<Monster, Vector2> monsterLastPositions;
         private Dictionary<Monster, float> monsterLastAttackTimes;
+
+        // Team damage tracking (per episode)
+        private float episodeTeamDamageDealt;
+        private float episodeTeamDamageTaken;
+        private Dictionary<Character, float> characterLastHealth;
+        private Dictionary<Monster, float> monsterLastHealth;
+
+        // Encoders
+        private StateEncoder stateEncoder;
 
         public float ObservationRadius => observationRadius;
         public EntityManager EntityManager => entityManager;
@@ -52,6 +63,13 @@ namespace Vampire.RL
             monsterEpisodeStartTimes = new Dictionary<Monster, float>();
             monsterLastPositions = new Dictionary<Monster, Vector2>();
             monsterLastAttackTimes = new Dictionary<Monster, float>();
+            characterLastHealth = new Dictionary<Character, float>();
+            monsterLastHealth = new Dictionary<Monster, float>();
+
+            episodeTeamDamageDealt = 0f;
+            episodeTeamDamageTaken = 0f;
+
+            stateEncoder = new StateEncoder();
         }
 
         /// <summary>
@@ -63,6 +81,15 @@ namespace Vampire.RL
             this.playerCharacter = playerCharacter;
             this.spatialGrid = entityManager.Grid;
             this.rewardCalculator = rewardCalculator;
+
+            if (coopPlayerManager == null)
+            {
+                coopPlayerManager = FindObjectOfType<Vampire.Gameplay.CoopPlayerManager>();
+                if (coopPlayerManager == null)
+                {
+                    Debug.LogWarning("CoopPlayerManager not found; falling back to single-player observations.");
+                }
+            }
 
             lastPlayerPosition = playerCharacter.transform.position;
             lastObservationTime = Time.time;
@@ -82,11 +109,105 @@ namespace Vampire.RL
         /// </summary>
         public float[] GetState(Monster monster)
         {
-            if (monster == null || playerCharacter == null)
-                return new float[20]; // Return empty state array
+            var gameState = BuildGameState(monster);
+            return stateEncoder.EncodeState(gameState);
+        }
 
-            // Return a basic state array
-            return new float[20];
+        /// <summary>
+        /// Build rich RLGameState including co-op teammates and nearby entities.
+        /// </summary>
+        public RLGameState BuildGameState(Monster monster, int agentId = 0)
+        {
+            var state = RLGameState.CreateDefault();
+
+            if (monster == null)
+                return state;
+
+            // Select primary player (first active), fallback to injected playerCharacter.
+            var players = GetActiveCharacters();
+            Character mainPlayer = players.Count > 0 ? players[0] : playerCharacter;
+
+            // Agent identity (which player this observation is for)
+            state.agentId = agentId;
+
+            // Player block
+            if (mainPlayer != null)
+            {
+                state.playerPosition = mainPlayer.transform.position;
+                state.playerVelocity = mainPlayer.Velocity;
+                state.playerHealth = mainPlayer.HP;
+            }
+
+            // Teammates (excluding main)
+            var teammateList = new List<TeammateInfo>();
+            if (players.Count > 1)
+            {
+                for (int i = 1; i < players.Count && teammateList.Count < 3; i++)
+                {
+                    var p = players[i];
+                    teammateList.Add(new TeammateInfo
+                    {
+                        position = p.transform.position,
+                        velocity = p.Velocity,
+                        health = p.HP,
+                        isDowned = false // no downed state in current character; assume alive
+                    });
+                }
+                state.teammates = teammateList.ToArray();
+            }
+
+            // Teammate count for masking
+            state.totalTeammateCount = teammateList.Count;
+
+            // Team aggregates
+            if (teammateList.Count > 0 && monster != null)
+            {
+                Vector2 focusTarget = monster.transform.position; // Boss as focus target
+                state.teamFocusTarget = focusTarget;
+
+                float totalDistance = 0f;
+                foreach (var teammate in teammateList)
+                {
+                    totalDistance += Vector2.Distance(teammate.position, focusTarget);
+                }
+                state.avgTeammateDistance = totalDistance / teammateList.Count;
+            }
+
+            // Monster block
+            state.monsterPosition = monster.transform.position;
+            state.monsterHealth = monster.HP;
+            state.currentAction = 0;
+            state.timeSinceLastAction = monsterLastAttackTimes.TryGetValue(monster, out var lastAtk)
+                ? Time.time - lastAtk
+                : 0f;
+
+            // Environment
+            var nearbyMonsters = GetNearbyEntities(monster);
+            state.nearbyMonsters = nearbyMonsters
+                .Take(maxNearbyMonsters)
+                .Select(m => new NearbyMonster
+                {
+                    position = m.transform.position,
+                    monsterType = MonsterType.Melee, // TODO: read from blueprint
+                    health = m.HP,
+                    currentAction = 0
+                })
+                .Concat(Enumerable.Repeat(NearbyMonster.CreateEmpty(), Mathf.Max(0, maxNearbyMonsters - nearbyMonsters.Count)))
+                .ToArray();
+
+            state.nearbyCollectibles = CollectibleInfoArrayEmpty(10);
+
+            // Temporal
+            state.timeAlive = monsterEpisodeStartTimes.TryGetValue(monster, out var start)
+                ? Time.time - start
+                : 0f;
+            state.timeSincePlayerDamage = float.MaxValue;
+
+            // Team damage aggregates (tracked across episode)
+            state.teamDamageDealt = episodeTeamDamageDealt;
+            state.teamDamageTaken = episodeTeamDamageTaken;
+
+            return state;
         }
 
         /// <summary>
@@ -96,6 +217,9 @@ namespace Vampire.RL
         {
             // Update environment observations
             if (entityManager?.LivingMonsters == null) return;
+
+            // Track team damage
+            UpdateTeamDamageTracking();
 
             // Track monster states for learning
             foreach (var monster in entityManager.LivingMonsters)
@@ -107,8 +231,98 @@ namespace Vampire.RL
                     {
                         monsterLastPositions[monster] = monster.transform.position;
                     }
+
+                    if (!monsterEpisodeStartTimes.ContainsKey(monster))
+                    {
+                        monsterEpisodeStartTimes[monster] = Time.time;
+                    }
                 }
             }
+        }
+
+        /// <summary>
+        /// Track team damage dealt and taken across episode
+        /// </summary>
+        private void UpdateTeamDamageTracking()
+        {
+            var players = GetActiveCharacters();
+
+            // Track damage taken (health reduction)
+            foreach (var character in players)
+            {
+                if (!characterLastHealth.ContainsKey(character))
+                {
+                    characterLastHealth[character] = character.HP;
+                }
+
+                float healthDelta = characterLastHealth[character] - character.HP;
+                if (healthDelta > 0) // Health decreased = damage taken
+                {
+                    episodeTeamDamageTaken += healthDelta;
+                }
+
+                characterLastHealth[character] = character.HP;
+            }
+
+            // Track damage dealt (monster health reduction)
+            // Note: This is a simplified approach. For accurate tracking, consider
+            // subscribing to monster damage events or maintaining per-monster health tracking.
+            if (entityManager?.LivingMonsters != null)
+            {
+                foreach (var monster in entityManager.LivingMonsters)
+                {
+                    if (!monsterLastHealth.ContainsKey(monster))
+                    {
+                        monsterLastHealth[monster] = monster.HP;
+                    }
+
+                    float healthDelta = monsterLastHealth[monster] - monster.HP;
+                    if (healthDelta > 0) // Monster health decreased
+                    {
+                        episodeTeamDamageDealt += healthDelta;
+                    }
+
+                    monsterLastHealth[monster] = monster.HP;
+                }
+
+                // Clean up dead monsters from tracking
+                var deadMonsters = monsterLastHealth.Keys.Where(m => m == null || m.HP <= 0).ToList();
+                foreach (var dead in deadMonsters)
+                {
+                    monsterLastHealth.Remove(dead);
+                }
+            }
+        }
+
+        private List<Character> GetActiveCharacters()
+        {
+            var list = new List<Character>();
+
+            if (coopPlayerManager != null)
+            {
+                foreach (var pi in coopPlayerManager.ActivePlayers)
+                {
+                    var c = pi != null ? pi.GetComponent<Character>() : null;
+                    if (c != null) list.Add(c);
+                }
+            }
+
+            if (list.Count == 0 && playerCharacter != null)
+            {
+                list.Add(playerCharacter);
+            }
+
+            return list;
+        }
+
+        private CollectibleInfo[] CollectibleInfoArrayEmpty(int count)
+        {
+            var arr = new CollectibleInfo[count];
+            for (int i = 0; i < count; i++)
+            {
+                arr[i] = CollectibleInfo.CreateEmpty();
+            }
+            return arr;
         }
 
         /// <summary>
@@ -437,6 +651,22 @@ namespace Vampire.RL
             {
                 monsterLastAttackTimes[monster] = Time.time;
             }
+        }
+
+        /// <summary>
+        /// Reset episode state, clearing damage tracking and episode timers
+        /// </summary>
+        public void ResetEpisode()
+        {
+            episodeTeamDamageDealt = 0f;
+            episodeTeamDamageTaken = 0f;
+            characterLastHealth.Clear();
+            monsterLastHealth.Clear();
+            monsterEpisodeStartTimes.Clear();
+            monsterLastPositions.Clear();
+            monsterLastAttackTimes.Clear();
+
+            Debug.Log("RL Episode reset - damage tracking cleared");
         }
 
         private void OnDestroy()

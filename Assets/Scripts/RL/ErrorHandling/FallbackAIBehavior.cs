@@ -79,7 +79,7 @@ namespace Vampire.RL
                 // Move toward player
                 rb.linearVelocity = directionToPlayer * fallbackMovementSpeed;
             }
-            else
+            else if (distanceToPlayer > stopDistance)
             {
                 // Stop and attack
                 rb.linearVelocity *= 0.9f; // Decelerate
@@ -90,6 +90,11 @@ namespace Vampire.RL
                     AttackPlayer();
                     lastAttackTime = Time.time;
                 }
+            }
+            else
+            {
+                // Too close: hold position to avoid overlapping the player
+                rb.linearVelocity = Vector2.zero;
             }
         }
 

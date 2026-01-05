@@ -1,0 +1,325 @@
+@startuml ClassDiagram_CoreRL_Components
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam classBorderColor #333333
+left to right direction
+
+'=== PHƯƠNG PHÁP TRÍCH DANH TỪ ===
+'Thực thể (Entity): RLSystem, RLEnvironment, RLMonster, PolicyNetwork, RewardCalculator
+'Biên (Boundary): StateEncoder
+'Điều khiển (Control): ActionDecoder
+'Danh từ từ yêu cầu: State (trạng thái), Reward (phần thưởng), Agent (tác nhân), Observation (quan sát)
+
+'=== ABSTRACT & INTERFACE ===
+interface ILearningAgent <<interface>> {
+  {abstract} + SelectAction(observation: float[]): int
+  {abstract} + Learn(transition: Transition): void
+  {abstract} + GetQValues(observation: float[]): float[]
+  {abstract} + SaveModel(path: string): void
+  {abstract} + LoadModel(path: string): void
+}
+
+interface IActionDecoder <<interface>> {
+  {abstract} + Decode(actionIndex: int): MonsterAction
+  {abstract} + GetActionSpace(): ActionSpace
+  {abstract} + GetActionSize(): int
+}
+
+interface IEnvironment <<interface>> {
+  {abstract} + GetObservation(agentId: int): float[]
+  {abstract} + CalculateReward(agentId: int, action: int): float
+  {abstract} + Reset(): void
+  {abstract} + Step(action: int): Transition
+}
+
+'=== CORE CONTROL CLASS ===
+class RLSystem <<control>> {
+  - trainingMode: bool
+  - agentPool: Dictionary<int, RLMonster>
+  - environment: RLEnvironment
+  - checkpointManager: CheckpointManager
+  - performanceMonitor: PerformanceMonitor
+  __
+  + Initialize(configPath: string): void
+  + RegisterAgent(monster: RLMonster, agentId: int): void
+  + UnregisterAgent(agentId: int): void
+  + GetEnvironment(): RLEnvironment
+  + SetTrainingMode(enabled: bool): void
+  + GetAgentCount(): int
+  + Update(): void
+}
+
+'=== ENVIRONMENT (ENTITY) ===
+class RLEnvironment <<entity>> implements IEnvironment {
+  - observationRadius: float
+  - spatialGrid: SpatialHashGrid
+  - entityManager: EntityManager
+  - playerCharacter: Character
+  - stateEncoder: StateEncoder
+  - rewardCalculator: RewardCalculator
+  - episodeStepCount: int
+  __
+  + GetObservation(agentId: int): float[]
+  + CalculateReward(agentId: int, action: int): float
+  + Reset(): void
+  + Step(agentId: int, action: int): Transition
+  + IsTerminal(): bool
+  + GetGameState(): RLGameState
+  + GetNearbyAgents(agentId: int, radius: float): List<int>
+}
+
+'=== STATE ENCODING (BOUNDARY) ===
+class StateEncoder <<boundary>> {
+  - observationSize: int
+  - normalizeRange: Vector2
+  - featureWeights: float[]
+  __
+  + Encode(gameState: RLGameState): float[]
+  + EncodeAgent(agent: RLMonster): float[]
+  + EncodePlayer(player: Character): float[]
+  + EncodeEnvironment(env: RLEnvironment): float[]
+  + Normalize(values: float[]): float[]
+  + GetObservationSize(): int
+}
+
+'=== REWARD CALCULATION ===
+class RewardCalculator <<boundary>> {
+  - damageWeight: float
+  - survivalWeight: float
+  - distanceWeight: float
+  - coopRewardWeight: float
+  - aggroShareWeight: float
+  - formationWeight: float
+  __
+  + CalculateReward(agentId: int, action: int, state: RLGameState): float
+  + CalculateDamageReward(agentId: int, enemiesKilled: int): float
+  + CalculateSurvivalReward(agentId: int, timeAlive: float): float
+  + CalculateDistanceReward(agentId: int, targetDist: float): float
+  + CalculateCoopReward(agentId: int, teamIndices: List<int>): float
+  + CalculateAssistReward(agentId: int): float
+  + CalculateAggroShareReward(agentId: int, aggroDistribution: float[]): float
+  + CalculateFormationReward(agentId: int, positions: Vector3[]): float
+  + NormalizeReward(reward: float): float
+}
+
+'=== ACTION DECODING (CONTROL) ===
+class ActionDecoder <<control>> implements IActionDecoder {
+  - actionSpace: ActionSpace
+  - actionMappings: Dictionary<int, MonsterAction>
+  __
+  + Decode(actionIndex: int): MonsterAction
+  + GetActionSpace(): ActionSpace
+  + GetActionSize(): int
+  + GetActionName(actionIndex: int): string
+  + ValidateAction(actionIndex: int): bool
+}
+
+'=== RL AGENT (ENTITY) ===
+class RLMonster <<entity>> {
+  - currentState: RLGameState
+  - previousState: RLGameState
+  - previousAction: MonsterAction
+  - previousReward: float
+  - learningAgent: ILearningAgent
+  - actionDecoder: IActionDecoder
+  - isTraining: bool
+  - episodeReward: float
+  __
+  + Init(environment: RLEnvironment, player: Character): void
+  + DecideAction(observation: float[]): MonsterAction
+  + OnActionComplete(reward: float): void
+  + OnEpisodeEnd(totalReward: float): void
+  + SetTrainingMode(enabled: bool): void
+  + Reset(): void
+  + GetEpisodeReward(): float
+  + StoreTransition(transition: Transition): void
+}
+
+'=== POLICY NETWORK (ENTITY) ===
+class PolicyNetwork <<entity>> {
+  - weights: Matrix[]
+  - biases: Vector[]
+  - architecture: NetworkArchitecture
+  - inputSize: int
+  - hiddenLayers: int[]
+  - outputSize: int
+  __
+  + Forward(observation: float[]): float[]
+  + UpdateWeights(gradients: Matrix[]): void
+  + GetWeights(): Matrix[]
+  + SetWeights(weights: Matrix[]): void
+  + Save(path: string): void
+  + Load(path: string): void
+  + Clone(): PolicyNetwork
+  + GetArchitecture(): NetworkArchitecture
+}
+
+'=== CONCRETE LEARNING AGENTS ===
+class DQNAgent <<entity>> implements ILearningAgent {
+  - qNetwork: PolicyNetwork
+  - targetNetwork: PolicyNetwork
+  - epsilon: float
+  - learningRate: float
+  __
+  + SelectAction(observation: float[]): int
+  + Learn(transition: Transition): void
+  + GetQValues(observation: float[]): float[]
+  + SaveModel(path: string): void
+  + LoadModel(path: string): void
+  + UpdateTargetNetwork(): void
+}
+
+class PPOAgent <<entity>> implements ILearningAgent {
+  - policyNetwork: PolicyNetwork
+  - valueNetwork: PolicyNetwork
+  - clipRatio: float
+  - learningRate: float
+  - entropyCoef: float
+  __
+  + SelectAction(observation: float[]): int
+  + Learn(transition: Transition): void
+  + GetQValues(observation: float[]): float[]
+  + SaveModel(path: string): void
+  + LoadModel(path: string): void
+  + ComputeLoss(batch: Transition[]): float
+  + ComputeGradient(loss: float): Vector
+}
+
+'=== DATA STRUCTURES ===
+class Transition {
+  + state: float[]
+  + action: int
+  + reward: float
+  + nextState: float[]
+  + isDone: bool
+  + agentId: int
+  __
+  + GetTransitionTuple(): (float[], int, float, float[], bool)
+}
+
+class RLGameState {
+  + playerPosition: Vector3
+  + playerHealth: float
+  + agentPositions: Vector3[]
+  + agentHealths: float[]
+  + enemyCount: int
+  + timeAlive: float
+  __
+  + GetState(): Dictionary<string, object>
+  + Clone(): RLGameState
+}
+
+class ActionSpace {
+  + moveUp: int
+  + moveDown: int
+  + moveLeft: int
+  + moveRight: int
+  + attack: int
+  + cooperate: int
+  - size: int
+  __
+  + GetSize(): int
+  + GetActionNames(): string[]
+}
+
+class MonsterAction {
+  + actionType: ActionType
+  + direction: Vector3
+  + targetId: int
+  + priority: float
+  __
+  + Execute(monster: Monster): void
+}
+
+'=== COMPOSITION & AGGREGATION ===
+RLSystem "1" *-- "1" RLEnvironment : creates and manages\nComposition
+RLSystem "1" o-- "1" CheckpointManager : aggregates
+RLSystem "1" o-- "1" PerformanceMonitor : aggregates
+RLSystem "1" o-- "0..*" RLMonster : manages
+
+RLEnvironment "1" *-- "1" StateEncoder : creates\nComposition
+RLEnvironment "1" *-- "1" RewardCalculator : creates\nComposition
+RLEnvironment "1" o-- "1" SpatialHashGrid : uses
+RLEnvironment "1" o-- "1" EntityManager : uses
+
+RLMonster "1" --> "1" ILearningAgent : delegates to
+RLMonster "1" --> "1" IActionDecoder : uses
+RLMonster "1" --> "0..*" Transition : generates
+
+DQNAgent "1" *-- "1" PolicyNetwork : owns\nComposition
+DQNAgent "1" *-- "1" PolicyNetwork : owns target network\nComposition
+
+PPOAgent "1" *-- "1" PolicyNetwork : owns policy\nComposition
+PPOAgent "1" *-- "1" PolicyNetwork : owns value\nComposition
+
+ActionDecoder "1" *-- "1" ActionSpace : creates\nComposition
+
+RLMonster --> MonsterAction : produces
+Transition "1" o-- "1" RLGameState : contains\nAggregation
+
+'=== INHERITANCE ===
+RLMonster --|> Monster : extends (Mũi tên liền nét)
+ILearningAgent <|.. DQNAgent : implements
+ILearningAgent <|.. PPOAgent : implements
+IActionDecoder <|.. ActionDecoder : implements
+IEnvironment <|.. RLEnvironment : implements
+
+'=== NOTES ===
+note right of StateEncoder
+  **Phương pháp trích danh từ:**
+  "State Encoder" = (State+Encode)
+  Danh từ: State(trạng thái), 
+  Hành động: Encode(mã hóa)
+  Mục đích: Chuyển trạng thái game
+  thành vector quan sát cho NN
+end note
+
+note right of RewardCalculator
+  **Phương pháp trích danh từ:**
+  "Reward Calculator" = 
+  (Reward+Calculate)
+  Danh từ: Reward(phần thưởng),
+  Hành động: Calculate(tính toán)
+  Mục đích: Tính phần thưởng dựa
+  trên hành động và trạng thái
+end note
+
+note bottom of PolicyNetwork
+  **Phương pháp trích danh từ:**
+  "PolicyNetwork" = Policy (chính sách)
+  + Network (mạng)
+  Danh từ từ RL: Policy (chính sách
+  hành động), Network (mạng nơ-ron)
+  Mục đích: Lưu trữ và tính toán
+  hành động tối ưu
+end note
+
+note bottom of DQNAgent
+  **DQN = Deep Q-Network**
+  Thuật toán RL cơ bản
+  Sử dụng hai mạng:
+  - Q-Network (chính)
+  - Target Network (mục tiêu)
+end note
+
+note bottom of PPOAgent
+  **PPO = Proximal Policy Optimization**
+  Thuật toán RL hiện đại
+  Sử dụng hai mạng:
+  - Policy Network (chính sách)
+  - Value Network (đánh giá)
+end note
+
+legend right
+  |<#FFE6E6> Entity (Thực thể) |
+  |<#E6F3FF> Boundary (Biên) |
+  |<#E6FFE6> Control (Điều khiển) |
+  |<#FFFFE6> Data Structure |
+  |<#F0F0F0> Interface |
+  |   Composition (◆-) |
+  |   Aggregation (○--) |
+  |   Inheritance (--|>) |
+endlegend
+
+@enduml

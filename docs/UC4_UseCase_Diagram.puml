@@ -1,0 +1,151 @@
+@startuml UC4_RL_Action_Inference_Decomposition
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam actorStyle awesome
+left to right direction
+
+' ====== ACTORS ======
+actor "EnemyManager" as EnemyMgr #LightBlue
+actor "RL System" as RLSystem #Orange
+actor "CombatSystem" as Combat #LightGreen
+
+' ====== MAIN SYSTEM BOUNDARY ======
+rectangle "UC4: Suy Luận Hành Động RL" {
+
+  usecase "UC4.1: Yêu cầu\nAction" as UC4_1 #LightYellow
+  usecase "UC4.2: Thu thập\nObservations" as UC4_2 #LightCyan
+  usecase "UC4.3: Normalize &\nEncode State" as UC4_3 #LightCyan
+  usecase "UC4.4: Policy\nForward Pass" as UC4_4 #LightSalmon
+  usecase "UC4.5: Decode\nOutput" as UC4_5 #LightCyan
+  usecase "UC4.6: Áp dụng\nAction" as UC4_6 #LightYellow
+  usecase "UC4.7: Exception\nHandling" as UC4_7 #Salmon
+
+  ' ===== Sub-flows của UC4.2 =====
+  rectangle "Observation Collection" {
+    usecase "Agent State\n(pos, health, cd)" as UC4_2a #WhiteSmoke
+    usecase "Player Positions" as UC4_2b #WhiteSmoke
+    usecase "Teammate States\n(nearby enemies)" as UC4_2c #WhiteSmoke
+  }
+
+  ' ===== Sub-flows của UC4.5 =====
+  rectangle "Action Decoding" {
+    usecase "Movement\nActions (0-3)" as UC4_5a #WhiteSmoke
+    usecase "Attack\nAction (4)" as UC4_5b #WhiteSmoke
+    usecase "Cooperation\nAction (5)" as UC4_5c #WhiteSmoke
+  }
+}
+
+' ====== ACTOR ASSOCIATIONS ======
+EnemyMgr --> UC4_1 : "request"
+RLSystem --> UC4_4 : "infer"
+Combat --> UC4_6 : "execute"
+
+' ====== MAIN FLOW SEQUENCE ======
+UC4_1 --> UC4_2 : <<precedes>>
+UC4_2 --> UC4_3 : <<precedes>>
+UC4_3 --> UC4_4 : <<precedes>>
+UC4_4 --> UC4_5 : <<precedes>>
+UC4_5 --> UC4_6 : <<precedes>>
+
+' ====== OBSERVATION DECOMPOSITION ======
+UC4_2 ..> UC4_2a : <<include>>
+UC4_2 ..> UC4_2b : <<include>>
+UC4_2 ..> UC4_2c : <<include>>
+
+' ====== ACTION DECODING DECOMPOSITION ======
+UC4_5 ..> UC4_5a : <<include>>
+UC4_5 ..> UC4_5b : <<include>>
+UC4_5 ..> UC4_5c : <<include>>
+
+' ====== EXCEPTION FLOWS ======
+UC4_4 ..> UC4_7 : <<exception>>\n(timeout > 50ms)
+UC4_5 ..> UC4_7 : <<exception>>\n(invalid action)
+
+' ====== NOTES ======
+note right of UC4_1
+  Decision step: 0.2s
+  Request from EnemyManager
+  for each agent_id
+end note
+
+note right of UC4_2a
+  - Position (x, y, z)
+  - Health points
+  - Ability cooldown
+end note
+
+note right of UC4_2b
+  - Player 1 position
+  - Player 2 position (co-op)
+  - Player health status
+end note
+
+note right of UC4_2c
+  - Other enemy positions
+  - Radius: ~20 units
+  - Enemy team status
+end note
+
+note right of UC4_3
+  StateEncoder:
+  - Normalize: [-1, 1]
+  - Flatten: 90 dims
+  - Input tensor shape
+end note
+
+note right of UC4_4
+  Policy Network:
+  - Model: ONNX (exported)
+  - Latency: ~8-10ms GPU
+  - Latency: ~25-30ms CPU
+  - Batch: 1 agent/step
+end note
+
+note right of UC4_5a
+  Actions 0-3:
+  - 0: Move Up
+  - 1: Move Down
+  - 2: Move Left
+  - 3: Move Right
+end note
+
+note right of UC4_5b
+  Action 4:
+  - Spawn attack
+  - Trigger ability
+  - Hit detection
+end note
+
+note right of UC4_5c
+  Action 5:
+  - Focus target
+  - Coordinate with
+    teammate agents
+end note
+
+note right of UC4_6
+  EnemyManager:
+  - Apply to entity
+  - Physics update
+  - Animation trigger
+end note
+
+note right of UC4_7
+  **Timeout (> 50ms)**
+    → Use cached action
+    → Log warning
+  
+  **Invalid action**
+    → Clamp to valid
+    → Nearest action
+end note
+
+legend right
+  |<#LightYellow> Request/Execute |
+  |<#LightCyan> Observation & Decode |
+  |<#LightSalmon> Core Inference |
+  |<#Salmon> Error Handling |
+  |<#WhiteSmoke> Sub-flows |
+endlegend
+
+@enduml

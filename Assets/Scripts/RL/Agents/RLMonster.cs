@@ -186,17 +186,13 @@ namespace Vampire.RL
             if (rlEnvironment == null)
                 return;
 
-            // Get float array observations from environment
-            float[] stateArray = rlEnvironment.GetState(this);
-
-            // Update RLGameState with current information
+            // Build rich game state (includes teammates) and keep for agent/reward
             previousState = currentState;
-            currentState = RLGameState.CreateDefault();
+            currentState = rlEnvironment.BuildGameState(this);
             currentState.timeAlive = timeAlive;
             currentState.timeSincePlayerDamage = timeSinceLastDamage;
             currentState.monsterPosition = rb.position;
             currentState.monsterHealth = currentHealth / monsterBlueprint.hp;
-            currentState.playerPosition = playerCharacter.transform.position;
         }
 
         /// <summary>

@@ -12,12 +12,12 @@ namespace Vampire.RL
         public Vector2 playerPosition;
         public Vector2 playerVelocity;
         public float playerHealth;
-        
+
         [Header("Monster Information")]
         public Vector2 monsterPosition;
         public Vector2 monsterVelocity;
         public float monsterHealth;
-        
+
         [Header("Environment Information")]
         public Vector2[] nearbyMonsterPositions;
         public Vector2[] nearbyObstacles;
@@ -31,28 +31,28 @@ namespace Vampire.RL
         /// <returns>State as float array</returns>
         public float[] ToArray()
         {
-            var stateArray = new float[20]; // Fixed size as per design
+            var stateArray = new float[20]; // Legacy encoder path (single-player); co-op uses StateEncoder/RLGameState
             int index = 0;
-            
+
             // Player information (5 values)
             stateArray[index++] = playerPosition.x;
             stateArray[index++] = playerPosition.y;
             stateArray[index++] = playerVelocity.x;
             stateArray[index++] = playerVelocity.y;
             stateArray[index++] = playerHealth;
-            
+
             // Monster information (5 values)
             stateArray[index++] = monsterPosition.x;
             stateArray[index++] = monsterPosition.y;
             stateArray[index++] = monsterVelocity.x;
             stateArray[index++] = monsterVelocity.y;
             stateArray[index++] = monsterHealth;
-            
+
             // Environment information (10 values)
             stateArray[index++] = timeSinceLastAttack;
             stateArray[index++] = distanceToPlayer;
             stateArray[index++] = monstersInRange;
-            
+
             // Nearby monsters (4 values - 2 positions max)
             for (int i = 0; i < 2; i++)
             {
@@ -67,7 +67,7 @@ namespace Vampire.RL
                     stateArray[index++] = 0f;
                 }
             }
-            
+
             // Nearby obstacles (3 values - 1 obstacle position + distance)
             if (nearbyObstacles != null && nearbyObstacles.Length > 0)
             {
@@ -81,7 +81,7 @@ namespace Vampire.RL
                 stateArray[index++] = 0f;
                 stateArray[index++] = 0f;
             }
-            
+
             return stateArray;
         }
 
@@ -94,38 +94,38 @@ namespace Vampire.RL
         {
             if (stateArray.Length < 20)
                 return new RLState();
-                
+
             var state = new RLState();
             int index = 0;
-            
+
             // Player information
             state.playerPosition = new Vector2(stateArray[index++], stateArray[index++]);
             state.playerVelocity = new Vector2(stateArray[index++], stateArray[index++]);
             state.playerHealth = stateArray[index++];
-            
+
             // Monster information
             state.monsterPosition = new Vector2(stateArray[index++], stateArray[index++]);
             state.monsterVelocity = new Vector2(stateArray[index++], stateArray[index++]);
             state.monsterHealth = stateArray[index++];
-            
+
             // Environment information
             state.timeSinceLastAttack = stateArray[index++];
             state.distanceToPlayer = stateArray[index++];
             state.monstersInRange = (int)stateArray[index++];
-            
+
             // Nearby monsters
             state.nearbyMonsterPositions = new Vector2[2];
             for (int i = 0; i < 2; i++)
             {
                 state.nearbyMonsterPositions[i] = new Vector2(stateArray[index++], stateArray[index++]);
             }
-            
+
             // Nearby obstacles
             state.nearbyObstacles = new Vector2[1];
             state.nearbyObstacles[0] = new Vector2(stateArray[index++], stateArray[index++]);
             // Skip the distance value as it's calculated
             index++;
-            
+
             return state;
         }
 
@@ -147,7 +147,7 @@ namespace Vampire.RL
                 return false;
 
             // Check reasonable value ranges
-            if (playerHealth < 0 || monsterHealth < 0 || timeSinceLastAttack < 0 || 
+            if (playerHealth < 0 || monsterHealth < 0 || timeSinceLastAttack < 0 ||
                 distanceToPlayer < 0 || monstersInRange < 0)
                 return false;
 

@@ -1,0 +1,422 @@
+@startuml ClassDiagram_Training_Components
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classAttributeIconSize 0
+skinparam classBorderColor #333333
+left to right direction
+
+'=== PHƯƠNG PHÁP TRÍCH DANH TỪ ===
+'Thực thể (Entity): TrainingCoordinator, ExperienceManager, PolicyNetwork, CheckpointManager, MetricsLogger
+'Biên (Boundary): TrainingScheduler, HyperparameterConfig
+'Điều khiển (Control): TrainingController
+'Danh từ từ yêu cầu: Experience (kinh nghiệm), Checkpoint (mốc lưu), Metrics (chỉ số), Batch (loạt dữ liệu)
+
+'=== ABSTRACT & INTERFACE ===
+interface IOptimizer <<interface>> {
+  {abstract} + Step(gradients: Vector, learningRate: float): void
+  {abstract} + SetMomentum(momentum: float): void
+  {abstract} + SetWeightDecay(decay: float): void
+}
+
+interface ILearningAgent <<interface>> {
+  {abstract} + Learn(batch: Transition[]): float
+  {abstract} + GetNetwork(): PolicyNetwork
+  {abstract} + GetLoss(): float
+}
+
+interface IExperienceBuffer <<interface>> {
+  {abstract} + Add(transition: Transition): void
+  {abstract} + Sample(batchSize: int): Transition[]
+  {abstract} + Size(): int
+  {abstract} + Clear(): void
+  {abstract} + IsFull(): bool
+}
+
+'=== TRAINING CONTROL CLASS ===
+class TrainingCoordinator <<control>> {
+  - trainingEnabled: bool
+  - currentEpisode: int
+  - currentStep: int
+  - totalSteps: int
+  - scheduler: TrainingScheduler
+  - experienceManager: ExperienceManager
+  - policyNetwork: PolicyNetwork
+  - checkpointManager: CheckpointManager
+  - metricsLogger: MetricsLogger
+  __
+  + Initialize(config: HyperparameterConfig): void
+  + StartTraining(maxSteps: int): void
+  + StopTraining(): void
+  + TrainStep(): void
+  + SaveCheckpoint(isBest: bool): void
+  + LoadCheckpoint(checkpointPath: string): void
+  + GetCurrentEpisode(): int
+  + GetCurrentStep(): int
+  + IsTrainingComplete(): bool
+}
+
+'=== EXPERIENCE MANAGEMENT (ENTITY) ===
+class ExperienceManager <<entity>> implements IExperienceBuffer {
+  - buffer: Queue<Transition>
+  - capacity: int
+  - currentSize: int
+  - priorityWeights: float[]
+  - prioritySampling: bool
+  __
+  + Add(transition: Transition): void
+  + Sample(batchSize: int): Transition[]
+  + SamplePrioritized(batchSize: int): Transition[]
+  + Size(): int
+  + Clear(): void
+  + IsFull(): bool
+  + GetExperienceStats(): ExperienceStats
+}
+
+'=== POLICY NETWORK (ENTITY) ===
+class PolicyNetwork <<entity>> {
+  - weights: Matrix[]
+  - biases: Vector[]
+  - architecture: NetworkArchitecture
+  - inputSize: int
+  - hiddenLayers: int[]
+  - hiddenActivation: string
+  - outputSize: int
+  - device: ComputeDevice
+  __
+  + Forward(observation: float[]): float[]
+  + Backward(loss: float): Vector[]
+  + UpdateWeights(gradients: Matrix[], learningRate: float): void
+  + GetWeights(): Matrix[]
+  + SetWeights(weights: Matrix[]): void
+  + Save(path: string): void
+  + Load(path: string): void
+  + ExportONNX(path: string): void
+  + Clone(): PolicyNetwork
+  + GetArchitecture(): NetworkArchitecture
+}
+
+'=== CHECKPOINT MANAGEMENT (ENTITY) ===
+class CheckpointManager <<entity>> {
+  - checkpointPath: string
+  - bestScorePath: string
+  - latestPath: string
+  - versionedCheckpoints: Dictionary<int, string>
+  - bestScore: float
+  - checkpointInterval: int
+  __
+  + SaveCheckpoint(network: PolicyNetwork, metrics: TrainingMetrics, isBest: bool): string
+  + LoadCheckpoint(checkpointPath: string): PolicyNetwork
+  + GetLatestCheckpoint(): string
+  + GetBestCheckpoint(): string
+  + ListCheckpoints(): List<CheckpointInfo>
+  + DeleteCheckpoint(checkpointPath: string): void
+  + GetCheckpointMetrics(checkpointPath: string): TrainingMetrics
+  + LoadMetadata(checkpointPath: string): CheckpointMetadata
+  + SaveMetadata(checkpointPath: string, metadata: CheckpointMetadata): void
+}
+
+'=== METRICS LOGGING (ENTITY) ===
+class MetricsLogger <<entity>> {
+  - rewardsHistory: float[]
+  - lossHistory: float[]
+  - episodeLengthHistory: int[]
+  - learningRateHistory: float[]
+  - gradientNormHistory: float[]
+  - logPath: string
+  - tensorboardEnabled: bool
+  __
+  + LogReward(episodeIdx: int, reward: float): void
+  + LogLoss(stepIdx: int, loss: float): void
+  + LogEpisodeLength(episodeIdx: int, length: int): void
+  + LogLearningRate(stepIdx: int, lr: float): void
+  + LogGradientNorm(stepIdx: int, norm: float): void
+  + LogMetrics(metrics: TrainingMetrics): void
+  + Export(exportPath: string, format: string): void
+  + GetRewardsHistory(): float[]
+  + GetLossHistory(): float[]
+  + PrintSummary(): void
+}
+
+'=== TRAINING SCHEDULER (BOUNDARY) ===
+class TrainingScheduler <<boundary>> {
+  - baselearningRate: float
+  - scheduleType: string
+  - decayRate: float
+  - warmupSteps: int
+  - totalSteps: int
+  - currentStep: int
+  __
+  + GetLearningRate(step: int): float
+  + Step(currentStep: int): void
+  + SetScheduleType(type: string): void
+  + GetScheduleInfo(): ScheduleInfo
+  + ResetSchedule(): void
+}
+
+'=== HYPERPARAMETER CONFIG (BOUNDARY) ===
+class HyperparameterConfig <<boundary>> {
+  - learningRate: float
+  - batchSize: int
+  - bufferCapacity: int
+  - maxSteps: int
+  - updateFrequency: int
+  - checkpointInterval: int
+  - gamma: float
+  - clipRatio: float
+  - entropyCoef: float
+  - valueCoef: float
+  - maxGradientNorm: float
+  __
+  + LoadFromFile(configPath: string): HyperparameterConfig
+  + SaveToFile(savePath: string): void
+  + Validate(): bool
+  + GetConfigDict(): Dictionary<string, object>
+}
+
+'=== OPTIMIZER (BOUNDARY) ===
+class AdamOptimizer <<boundary>> implements IOptimizer {
+  - learningRate: float
+  - beta1: float
+  - beta2: float
+  - epsilon: float
+  - m: Vector[]
+  - v: Vector[]
+  __
+  + Step(gradients: Vector, learningRate: float): void
+  + SetMomentum(momentum: float): void
+  + SetWeightDecay(decay: float): void
+  + Update(weights: Vector[], gradients: Vector[]): Vector[]
+  + Reset(): void
+}
+
+class SGDOptimizer <<boundary>> implements IOptimizer {
+  - learningRate: float
+  - momentum: float
+  - weightDecay: float
+  - velocity: Vector[]
+  __
+  + Step(gradients: Vector, learningRate: float): void
+  + SetMomentum(momentum: float): void
+  + SetWeightDecay(decay: float): void
+  + Update(weights: Vector[], gradients: Vector[]): Vector[]
+}
+
+'=== LEARNING AGENTS ===
+class DQNTrainer <<entity>> implements ILearningAgent {
+  - policyNetwork: PolicyNetwork
+  - targetNetwork: PolicyNetwork
+  - optimizer: AdamOptimizer
+  - epsilon: float
+  - epsilonDecay: float
+  - gamma: float
+  __
+  + Learn(batch: Transition[]): float
+  + GetNetwork(): PolicyNetwork
+  + GetLoss(): float
+  + UpdateTargetNetwork(): void
+  + ComputeQTarget(batch: Transition[]): float[]
+  + ComputeTDError(predictions: float[], targets: float[]): float[]
+}
+
+class PPOTrainer <<entity>> implements ILearningAgent {
+  - policyNetwork: PolicyNetwork
+  - valueNetwork: PolicyNetwork
+  - optimizer: AdamOptimizer
+  - clipRatio: float
+  - entropyCoef: float
+  - valueCoef: float
+  __
+  + Learn(batch: Transition[]): float
+  + GetNetwork(): PolicyNetwork
+  + GetLoss(): float
+  + ComputeAdvantage(batch: Transition[]): float[]
+  + ComputePolicyLoss(batch: Transition[]): float
+  + ComputeValueLoss(batch: Transition[]): float
+  + ComputeEntropy(logProbs: float[]): float
+}
+
+'=== DATA STRUCTURES ===
+class Transition {
+  + state: float[]
+  + action: int
+  + reward: float
+  + nextState: float[]
+  + isDone: bool
+  + agentId: int
+  + logProb: float
+  + value: float
+  __
+  + GetTransitionTuple(): (float[], int, float, float[], bool)
+  + ToString(): string
+}
+
+class TrainingMetrics {
+  + episodeReward: float
+  + episodeLength: int
+  + averageLoss: float
+  + averageGradientNorm: float
+  + learningRate: float
+  + timestamp: DateTime
+  __
+  + GetMetricsDict(): Dictionary<string, float>
+  + UpdateFromBatch(batch: Transition[]): void
+}
+
+class ExperienceStats {
+  + bufferSize: int
+  + bufferCapacity: int
+  + averageReward: float
+  + minReward: float
+  + maxReward: float
+  + fillPercentage: float
+  __
+  + ComputeStats(buffer: Queue<Transition>): ExperienceStats
+}
+
+class CheckpointInfo {
+  + checkpointPath: string
+  + episodeIdx: int
+  + stepIdx: int
+  + score: float
+  + timestamp: DateTime
+  + isBest: bool
+  __
+  + ToString(): string
+}
+
+class CheckpointMetadata {
+  + version: string
+  + timestamp: DateTime
+  + episodeIdx: int
+  + stepIdx: int
+  + hyperparameters: HyperparameterConfig
+  + trainingMetrics: TrainingMetrics
+  __
+  + SaveToJSON(path: string): void
+  + LoadFromJSON(path: string): CheckpointMetadata
+}
+
+class NetworkArchitecture {
+  + inputSize: int
+  + hiddenLayers: int[]
+  + outputSize: int
+  + hiddenActivation: string
+  + outputActivation: string
+  __
+  + GetLayerSizes(): int[]
+  + GetTotalParameters(): int
+}
+
+'=== COMPOSITION & AGGREGATION ===
+TrainingCoordinator "1" *-- "1" ExperienceManager : creates\nComposition
+TrainingCoordinator "1" *-- "1" PolicyNetwork : creates\nComposition
+TrainingCoordinator "1" *-- "1" CheckpointManager : creates\nComposition
+TrainingCoordinator "1" *-- "1" MetricsLogger : creates\nComposition
+TrainingCoordinator "1" o-- "1" TrainingScheduler : uses\nAggregation
+TrainingCoordinator "1" o-- "1" HyperparameterConfig : uses\nAggregation
+TrainingCoordinator "1" o-- "1" ILearningAgent : controls\nAggregation
+
+ExperienceManager "1" o-- "0..*" Transition : stores\nAggregation
+
+PolicyNetwork "1" o-- "1" NetworkArchitecture : has\nAggregation
+PolicyNetwork "1" o-- "1" IOptimizer : uses\nAggregation
+
+DQNTrainer "1" *-- "1" PolicyNetwork : owns policy\nComposition
+DQNTrainer "1" *-- "1" PolicyNetwork : owns target\nComposition
+DQNTrainer "1" *-- "1" AdamOptimizer : owns\nComposition
+
+PPOTrainer "1" *-- "1" PolicyNetwork : owns policy\nComposition
+PPOTrainer "1" *-- "1" PolicyNetwork : owns value\nComposition
+PPOTrainer "1" *-- "1" AdamOptimizer : owns\nComposition
+
+CheckpointManager "1" o-- "0..*" CheckpointInfo : manages\nAggregation
+CheckpointManager "1" o-- "1" CheckpointMetadata : stores\nAggregation
+
+MetricsLogger "1" o-- "0..*" TrainingMetrics : logs\nAggregation
+
+HyperparameterConfig "1" o-- "1" TrainingScheduler : references\nAggregation
+
+'=== INHERITANCE ===
+ILearningAgent <|.. DQNTrainer : implements
+ILearningAgent <|.. PPOTrainer : implements
+IOptimizer <|.. AdamOptimizer : implements
+IOptimizer <|.. SGDOptimizer : implements
+IExperienceBuffer <|.. ExperienceManager : implements
+
+'=== NOTES ===
+note right of ExperienceManager
+  **Phương pháp trích danh từ:**
+  "Experience Manager" = 
+  (Experience + Manage)
+  Danh từ: Experience (kinh nghiệm),
+  Hành động: Manage (quản lý)
+  Mục đích: Quản lý replay buffer,
+  lưu trữ (s,a,r,s') tuple
+end note
+
+note right of CheckpointManager
+  **Phương pháp trích danh từ:**
+  "Checkpoint Manager" = 
+  (Checkpoint + Manage)
+  Danh từ: Checkpoint (mốc lưu),
+  Hành động: Manage (quản lý)
+  Mục đích: Lưu/khôi phục trạng thái
+  training, hỗ trợ resume
+end note
+
+note bottom of TrainingCoordinator
+  **Vai trò Control:**
+  Điều phối vòng lặp training:
+  1. Sample batch từ buffer
+  2. Tính toán loss & gradient
+  3. Cập nhật weights
+  4. Log metrics
+  5. Lưu checkpoint
+end note
+
+note bottom of MetricsLogger
+  **Phương pháp trích danh từ:**
+  "MetricsLogger" = 
+  (Metrics + Logger)
+  Danh từ: Metrics (chỉ số),
+  Hành động: Log (ghi nhật ký)
+  Mục đích: Theo dõi hiệu năng training
+  qua TensorBoard hoặc log files
+end note
+
+note bottom of AdamOptimizer
+  **Adam = Adaptive Moment Estimation**
+  Tối ưu hóa hiện đại:
+  - m: First moment (momentum)
+  - v: Second moment (RMSprop)
+  - Thích hợp cho deep learning
+end note
+
+note right of DQNTrainer
+  **DQN Training:**
+  - Sử dụng target network
+  - Experience replay (FIFO buffer)
+  - Epsilon-greedy exploration
+  - Phù hợp với discrete actions
+end note
+
+note right of PPOTrainer
+  **PPO Training:**
+  - Advantage Actor-Critic
+  - Clip policy loss
+  - Value function baseline
+  - Stable, hiệu quả convergence
+end note
+
+legend right
+  |<#FFE6E6> Entity (Thực thể) |
+  |<#E6F3FF> Boundary (Biên) |
+  |<#E6FFE6> Control (Điều khiển) |
+  |<#FFFFE6> Data Structure |
+  |<#F0F0F0> Interface |
+  |   Composition (◆-) |
+  |   Aggregation (○--) |
+  |   Inheritance (--|>) |
+endlegend
+
+@enduml

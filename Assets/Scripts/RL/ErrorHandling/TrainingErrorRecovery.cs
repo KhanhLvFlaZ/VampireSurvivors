@@ -98,6 +98,20 @@ namespace Vampire.RL
         }
 
         /// <summary>
+        /// Auto-save checkpoints based on episode interval.
+        /// </summary>
+        public void TryAutoCheckpoint(int episodeNumber)
+        {
+            if (!enableCheckpoints || checkpointInterval <= 0)
+                return;
+
+            if (episodeNumber % checkpointInterval == 0)
+            {
+                SaveCheckpoint(episodeNumber);
+            }
+        }
+
+        /// <summary>
         /// Restore training from checkpoint
         /// </summary>
         public bool RestoreFromCheckpoint(int checkpointIndex = -1)
