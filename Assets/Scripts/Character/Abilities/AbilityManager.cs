@@ -45,13 +45,13 @@ namespace Vampire
                 ability.Select();
                 ownedAbilities.Add(ability);
             }
-            
+
             newAbilities = new WeightedAbilities();
             foreach (GameObject abilityPrefab in levelBlueprint.abilityPrefabs)
             {
                 // Skip any abilities we already own
                 if (playerCharacter.Blueprint.startingAbilities.Contains(abilityPrefab)) continue;
-                
+
                 Ability ability = Instantiate(abilityPrefab, transform).GetComponent<Ability>();
                 ability.Init(abilityManager, entityManager, playerCharacter);
                 newAbilities.Add(ability);
@@ -63,6 +63,33 @@ namespace Vampire
             upgradeableValue.Register(this);
             registeredUpgradeableValues.Add(upgradeableValue);
             if (inUse) upgradeableValue.RegisterInUse();
+        }
+
+        /// <summary>
+        /// Mirror a selection by ability name (used to sync Player 1 choices to Player 2).
+        /// Returns true if an ability was found and selected.
+        /// </summary>
+        public bool TrySelectAbilityByName(string abilityName)
+        {
+            // Prefer owned abilities (upgrades)
+            Ability target = ownedAbilities.FirstOrDefault(a => a.Name == abilityName);
+            if (target != null)
+            {
+                target.Select();
+                return true;
+            }
+
+            // Otherwise pull from new abilities pool
+            target = newAbilities.FirstOrDefault(a => a.Name == abilityName);
+            if (target != null)
+            {
+                newAbilities.Remove(target);
+                target.Select();
+                ownedAbilities.Add(target);
+                return true;
+            }
+
+            return false;
         }
 
         public void UpgradeValue<T, TValue>(TValue value) where T : IUpgradeableValue
@@ -80,7 +107,7 @@ namespace Vampire
         public List<Ability> SelectAbilities()
         {
             List<Ability> selectedAbilities = new List<Ability>();
-            
+
             // Determine which abilities are currently available (have their requirements met)
             WeightedAbilities availableOwnedAbilities = ExtractAvailableAbilities(ownedAbilities);
             WeightedAbilities availableNewAbilities = ExtractAvailableAbilities(newAbilities);
@@ -116,9 +143,9 @@ namespace Vampire
             foreach (Ability ability in availableOwnedAbilities)
                 ownedAbilities.Add(ability);
 
-            return selectedAbilities;   
+            return selectedAbilities;
         }
-        
+
         public void ReturnAbilities(List<Ability> abilities)
         {
             foreach (Ability ability in abilities)
@@ -204,7 +231,7 @@ namespace Vampire
         private float OwnedChance()
         {
             float x = playerCharacter.CurrentLevel % 2 == 0 ? 2 : 1;
-            return 1 + 0.3f*x - 1/playerCharacter.Luck;
+            return 1 + 0.3f * x - 1 / playerCharacter.Luck;
         }
 
         /// <summary>
@@ -212,7 +239,7 @@ namespace Vampire
         /// </summary>
         private float FourthChance()
         {
-            return 1 - 1/playerCharacter.Luck;
+            return 1 - 1 / playerCharacter.Luck;
         }
 
         /// <summary>

@@ -35,7 +35,8 @@ namespace Vampire
             zPositioner.Init(playerCharacter.transform);
         }
 
-        public virtual void Setup(bool spawnAnimation = true, bool collectableDuringSpawn = true) {
+        public virtual void Setup(bool spawnAnimation = true, bool collectableDuringSpawn = true)
+        {
             col.enabled = !spawnAnimation || collectableDuringSpawn;
             beingCollected = false;
             if (magnetic)
@@ -56,7 +57,7 @@ namespace Vampire
             bool hasInventorySlot = entityManager.Inventory.TryGetInventorySlot(this, out InventorySlot inventorySlot);
             if (storeInInventory && hasInventorySlot && inventorySlot.IsFull())
                 return;
-            
+
             // Flag that this is being collected so that it does not accidentally get collected a second time
             beingCollected = true;
             col.enabled = false;
@@ -88,12 +89,12 @@ namespace Vampire
             float distance = Vector2.Distance(transform.position, playerCharacter.CenterTransform.position);
             if (distance == 0.0f) distance = Mathf.Epsilon;
             float c = juiciness / distance;
-            float timeScale = 1.0f/(lerpTime*Mathf.Sqrt(distance));
-            float t = -Time.deltaTime*timeScale;
+            float timeScale = 1.0f / (lerpTime * Mathf.Sqrt(distance));
+            float t = -Time.deltaTime * timeScale;
             Vector3 pickupPos = transform.position;
             while (t < 1)
             {
-                t += Time.deltaTime*timeScale;
+                t += Time.deltaTime * timeScale;
                 float lerpT = EasingUtils.EaseInBack(t, c);
                 if (lerpT >= 1) break;
                 transform.position = Vector3.LerpUnclamped(pickupPos, playerCharacter.CenterTransform.position, lerpT);
@@ -115,11 +116,11 @@ namespace Vampire
             float t = 0;
             float c = 0;//juiciness / distance;
             float timeScale = 2.0f;
-            t = -Time.deltaTime*timeScale;
+            t = -Time.deltaTime * timeScale;
             Vector3 pickupPos = transform.position;
             while (t < 1)
             {
-                t += Time.deltaTime*timeScale;
+                t += Time.deltaTime * timeScale;
                 float lerpT = EasingUtils.EaseInBack(t, c);
                 if (lerpT >= 1) break;
                 transform.position = Vector3.LerpUnclamped(pickupPos, Camera.main.ScreenToWorldPoint(inventorySlot.transform.position), lerpT);
@@ -139,8 +140,8 @@ namespace Vampire
             Vector3 spawnPosition = transform.position;
             while (!beingCollected && t < 1)
             {
-                transform.position = spawnPosition + Vector3.up*EasingUtils.Bounce(t, saHeight) + Vector3.right*horizontalSpeed*t;
-                t += Time.deltaTime*saSpeed;
+                transform.position = spawnPosition + Vector3.up * EasingUtils.Bounce(t, saHeight) + Vector3.right * horizontalSpeed * t;
+                t += Time.deltaTime * saSpeed;
                 yield return null;
             }
             col.enabled = true;
@@ -155,14 +156,27 @@ namespace Vampire
             while (t < 0.2f)
             {
                 zPositioner.enabled = false;
-                transform.position = spawnPosition + Vector3.up*EasingUtils.Bounce(t, saHeight) + Vector3.right*horizontalSpeed*t;
-                t += Time.deltaTime*saSpeed;
+                transform.position = spawnPosition + Vector3.up * EasingUtils.Bounce(t, saHeight) + Vector3.right * horizontalSpeed * t;
+                t += Time.deltaTime * saSpeed;
                 yield return null;
             }
         }
 
         void OnTriggerStay2D(Collider2D collider)
         {
+            // Allow any Character to collect (so Player 2 can pick up gems)
+            var character = collider.GetComponentInParent<Character>();
+            if (character == null)
+                return;
+
+            // Retarget to the collector so animations/fly-to-player use the correct transform
+            if (playerCharacter != character)
+            {
+                playerCharacter = character;
+                if (zPositioner != null)
+                    zPositioner.Init(playerCharacter.transform);
+            }
+
             if (collider == playerCharacter.CollectableCollider)
             {
                 Collect();

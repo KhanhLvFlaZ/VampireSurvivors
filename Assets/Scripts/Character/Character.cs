@@ -67,6 +67,8 @@ namespace Vampire
         public Vector2 Size => meleeHitboxCollider.bounds.size;
         public Dictionary<int, int> ListIndexByCellIndex { get; set; }
         public int QueryID { get; set; } = -1;
+        public bool HasHealthBar => healthBar != null;
+        public PointBar HealthBar => healthBar;
 
         void Awake()
         {
@@ -76,6 +78,11 @@ namespace Vampire
             spriteRenderer = spriteAnimator.GetComponent<SpriteRenderer>();
             // Prefer per-instance override; fallback to global selection
             characterBlueprint = blueprintOverride != null ? blueprintOverride : CrossSceneData.CharacterBlueprint;
+        }
+
+        public void SetHealthBar(PointBar bar)
+        {
+            healthBar = bar;
         }
 
         public virtual void Init(EntityManager entityManager, AbilityManager abilityManager, StatsManager statsManager)

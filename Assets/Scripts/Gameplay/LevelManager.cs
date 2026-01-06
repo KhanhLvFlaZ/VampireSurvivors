@@ -10,6 +10,7 @@ namespace Vampire
         [SerializeField] private Character playerCharacter2; // Player 2 for local co-op
         [SerializeField] private EntityManager entityManager;
         [SerializeField] private AbilityManager abilityManager;
+        private AbilityManager abilityManagerP2; // runtime-created for Player 2
         [SerializeField] private AbilitySelectionDialog abilitySelectionDialog;
         [SerializeField] private InfiniteBackground infiniteBackground;
         [SerializeField] private Inventory inventory;
@@ -32,6 +33,7 @@ namespace Vampire
             // Initialize the ability manager
             abilityManager.Init(this.levelBlueprint, entityManager, playerCharacter, abilityManager);
             abilitySelectionDialog.Init(abilityManager, entityManager, playerCharacter);
+            abilitySelectionDialog.OnAbilitySelected += MirrorAbilityToPlayer2;
             // Initialize the character
             playerCharacter.Init(entityManager, abilityManager, statsManager);
             playerCharacter.OnDeath.AddListener(GameOver);
@@ -54,9 +56,43 @@ namespace Vampire
 
             if (playerCharacter2 != null)
             {
+                // Create a dedicated AbilityManager for Player 2 so abilities spawn/upgrade independently
+                if (abilityManagerP2 == null)
+                {
+                    var go = new GameObject("AbilityManager_P2");
+                    go.transform.SetParent(transform);
+                    abilityManagerP2 = go.AddComponent<AbilityManager>();
+                }
+
+                abilityManagerP2.Init(this.levelBlueprint, entityManager, playerCharacter2, abilityManagerP2);
                 playerCharacter2.Init(entityManager, abilityManager, statsManager);
                 playerCharacter2.OnDeath.AddListener(GameOver);
                 Debug.Log("[LevelManager] Player 2 initialized");
+            }
+
+            // Ensure both players have world-space health bars; clone from the other if one is missing
+            if (playerCharacter != null && playerCharacter2 != null)
+            {
+                if (!playerCharacter.HasHealthBar && playerCharacter2.HasHealthBar)
+                {
+                    CloneHealthBar(playerCharacter2, playerCharacter, "[LevelManager] Cloned Player 2 health bar onto Player 1");
+                }
+                if (!playerCharacter2.HasHealthBar && playerCharacter.HasHealthBar)
+                {
+                    CloneHealthBar(playerCharacter, playerCharacter2, "[LevelManager] Cloned Player 1 health bar onto Player 2");
+                }
+                if (!playerCharacter.HasHealthBar && !playerCharacter2.HasHealthBar)
+                {
+                    Debug.LogWarning("[LevelManager] Both players missing health bars; no source to clone.");
+                }
+            }
+            else if (playerCharacter != null && !playerCharacter.HasHealthBar)
+            {
+                Debug.LogWarning("[LevelManager] Player 1 missing health bar and Player 2 not available to clone.");
+            }
+            else if (playerCharacter2 != null && !playerCharacter2.HasHealthBar)
+            {
+                Debug.LogWarning("[LevelManager] Player 2 missing health bar and Player 1 not available to clone.");
             }
 
             // Spawn initial gems
@@ -144,10 +180,36 @@ namespace Vampire
             SceneManager.LoadScene(SceneManager.GetActiveScene().name);
         }
 
+        private void MirrorAbilityToPlayer2(Ability ability)
+        {
+            if (abilityManagerP2 == null || ability == null)
+                return;
+
+            bool ok = abilityManagerP2.TrySelectAbilityByName(ability.Name);
+            if (!ok)
+            {
+                Debug.LogWarning($"[LevelManager] Could not mirror ability '{ability.Name}' to Player 2");
+            }
+        }
+
         public void ReturnToMainMenu()
         {
             Time.timeScale = 1;
             SceneManager.LoadScene(0);
+        }
+
+        private void CloneHealthBar(Character source, Character target, string logMessage)
+        {
+            var sourceBar = source.HealthBar;
+            if (sourceBar == null)
+                return;
+
+            var clonedBar = Instantiate(sourceBar, target.transform);
+            clonedBar.transform.localPosition = sourceBar.transform.localPosition;
+            clonedBar.transform.localRotation = sourceBar.transform.localRotation;
+            clonedBar.transform.localScale = sourceBar.transform.localScale;
+            target.SetHealthBar(clonedBar);
+            Debug.Log(logMessage);
         }
     }
 }

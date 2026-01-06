@@ -19,6 +19,7 @@ namespace Vampire
         private List<Ability> displayedAbilities;
         private bool menuOpen = false;
         public bool MenuOpen { get => menuOpen; }
+        public System.Action<Ability> OnAbilitySelected; // notify external listeners
 
         public void Init(AbilityManager abilityManager, EntityManager entityManager, Character playerCharacter)
         {
@@ -60,7 +61,7 @@ namespace Vampire
             {
                 if (i >= abilityCards.Count)
                     abilityCards.Add(Instantiate(abilityCardPrefab, abilityCardsParent).GetComponent<AbilityCard>());
-                abilityCards[i].Init(this, abilities[i], cardPopupDelay*i);
+                abilityCards[i].Init(this, abilities[i], cardPopupDelay * i);
                 abilityCards[i].gameObject.SetActive(true);
             }
             for (; i < abilityCards.Count; i++)
@@ -77,6 +78,11 @@ namespace Vampire
             pauseMenu.TimeIsFrozen = false;
             particles.SetActive(false);
             base.Close();
+        }
+
+        public void NotifyAbilitySelected(Ability ability)
+        {
+            OnAbilitySelected?.Invoke(ability);
         }
 
         public bool HasAvailableAbilities()
