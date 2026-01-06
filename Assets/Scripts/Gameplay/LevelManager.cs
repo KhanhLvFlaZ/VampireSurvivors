@@ -312,7 +312,7 @@ namespace Vampire
             {
                 // Compact rectangular health bar
                 canvasRt.sizeDelta = new Vector2(0.4f, 0.18f);
-                canvasRt.localPosition = new Vector3(-0.4f, 0.6f, 0f); // shifted left
+                canvasRt.localPosition = new Vector3(0f, 0.6f, 0f); // shifted left
                 canvasRt.localRotation = Quaternion.identity;
                 canvasRt.localScale = Vector3.one;
             }

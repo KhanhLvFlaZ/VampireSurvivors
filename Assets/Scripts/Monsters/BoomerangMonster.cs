@@ -15,7 +15,7 @@ namespace Vampire
         public override void Setup(int monsterIndex, Vector2 position, MonsterBlueprint monsterBlueprint, float hpBuff = 0)
         {
             base.Setup(monsterIndex, position, monsterBlueprint, hpBuff);
-            this.monsterBlueprint = (BoomerangMonsterBlueprint) monsterBlueprint;
+            this.monsterBlueprint = (BoomerangMonsterBlueprint)monsterBlueprint;
             boomerangIndex = entityManager.AddPoolForBoomerang(this.monsterBlueprint.boomerangPrefab);
             outOfRangeTime = 0;
         }
@@ -23,23 +23,28 @@ namespace Vampire
         protected override void FixedUpdate()
         {
             base.FixedUpdate();
-            Vector2 toPlayer = (playerCharacter.transform.position - transform.position);
-            float distance = toPlayer.magnitude;
-            Vector2 dirToPlayer = toPlayer/distance;
-            entityManager.Grid.UpdateClient(this);
-            timeSinceLastBoomerangAttack += Time.fixedDeltaTime;
-            if (distance <= monsterBlueprint.range)
+            // Target the nearest player
+            Character targetPlayer = GetNearestPlayer();
+            if (targetPlayer != null)
             {
-                rb.linearVelocity += dirToPlayer * monsterBlueprint.acceleration * Time.fixedDeltaTime / 2;
-                if (timeSinceLastBoomerangAttack >= 1.0f/monsterBlueprint.boomerangAttackSpeed)
+                Vector2 toPlayer = (targetPlayer.transform.position - transform.position);
+                float distance = toPlayer.magnitude;
+                Vector2 dirToPlayer = toPlayer / distance;
+                entityManager.Grid.UpdateClient(this);
+                timeSinceLastBoomerangAttack += Time.fixedDeltaTime;
+                if (distance <= monsterBlueprint.range)
                 {
-                    ThrowBoomerang(playerCharacter.transform.position);
-                    timeSinceLastBoomerangAttack = 0;
+                    rb.linearVelocity += dirToPlayer * monsterBlueprint.acceleration * Time.fixedDeltaTime / 2;
+                    if (timeSinceLastBoomerangAttack >= 1.0f / monsterBlueprint.boomerangAttackSpeed)
+                    {
+                        ThrowBoomerang(targetPlayer.transform.position);
+                        timeSinceLastBoomerangAttack = 0;
+                    }
                 }
-            }
-            else
-            {
-                rb.linearVelocity += dirToPlayer * monsterBlueprint.acceleration * Time.fixedDeltaTime;
+                else
+                {
+                    rb.linearVelocity += dirToPlayer * monsterBlueprint.acceleration * Time.fixedDeltaTime;
+                }
             }
         }
 
@@ -51,9 +56,14 @@ namespace Vampire
 
         void OnCollisionStay2D(Collision2D col)
         {
-            if (((monsterBlueprint.targetLayer & (1 << col.collider.gameObject.layer)) != 0) && timeSinceLastMeleeAttack >= 1.0f/monsterBlueprint.atkspeed)
+            if (((monsterBlueprint.targetLayer & (1 << col.collider.gameObject.layer)) != 0) && timeSinceLastMeleeAttack >= 1.0f / monsterBlueprint.atkspeed)
             {
-                playerCharacter.TakeDamage(monsterBlueprint.atk);
+                // Get the actual character being hit from the collision
+                Character hitCharacter = col.collider.GetComponentInParent<Character>();
+                if (hitCharacter != null)
+                {
+                    hitCharacter.TakeDamage(monsterBlueprint.atk);
+                }
                 timeSinceLastMeleeAttack = 0;
             }
         }

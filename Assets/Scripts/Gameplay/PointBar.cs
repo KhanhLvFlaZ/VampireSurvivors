@@ -45,7 +45,13 @@ namespace Vampire
 
         public void UpdateDisplay()
         {
-            barFill.sizeDelta = new Vector2(barBackground.rect.width * (currentPoints - minPoints)/(maxPoints - minPoints), barFill.sizeDelta.y);
+            float fillRatio = (currentPoints - minPoints) / (maxPoints - minPoints);
+            float newWidth = barBackground.rect.width * fillRatio;
+            barFill.sizeDelta = new Vector2(newWidth, barFill.sizeDelta.y);
+
+            // Center the bar by adjusting position: when bar shrinks, move it to stay centered
+            float widthDifference = barBackground.rect.width - newWidth;
+            barFill.anchoredPosition = new Vector2(widthDifference / 2f, barFill.anchoredPosition.y);
         }
 
         private void CheckPoints()

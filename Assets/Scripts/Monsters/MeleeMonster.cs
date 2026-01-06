@@ -11,7 +11,7 @@ namespace Vampire
         public override void Setup(int monsterIndex, Vector2 position, MonsterBlueprint monsterBlueprint, float hpBuff = 0)
         {
             base.Setup(monsterIndex, position, monsterBlueprint, hpBuff);
-            this.monsterBlueprint = (MeleeMonsterBlueprint) monsterBlueprint;
+            this.monsterBlueprint = (MeleeMonsterBlueprint)monsterBlueprint;
         }
 
         protected override void Update()
@@ -24,8 +24,13 @@ namespace Vampire
         protected override void FixedUpdate()
         {
             base.FixedUpdate();
-            Vector2 moveDirection = (playerCharacter.transform.position - transform.position).normalized;
-            rb.linearVelocity += moveDirection * monsterBlueprint.acceleration * Time.fixedDeltaTime;
+            // Chase the nearest player
+            Character targetPlayer = GetNearestPlayer();
+            if (targetPlayer != null)
+            {
+                Vector2 moveDirection = (targetPlayer.transform.position - transform.position).normalized;
+                rb.linearVelocity += moveDirection * monsterBlueprint.acceleration * Time.fixedDeltaTime;
+            }
             entityManager.Grid.UpdateClient(this);
 
             // Vector2 f = Vector2.zero;
@@ -50,10 +55,15 @@ namespace Vampire
 
         void OnCollisionStay2D(Collision2D col)
         {
-            if (alive && ((monsterBlueprint.meleeLayer & (1 << col.collider.gameObject.layer)) != 0) && timeSinceLastAttack >= 1.0f/monsterBlueprint.atkspeed)
+            if (alive && ((monsterBlueprint.meleeLayer & (1 << col.collider.gameObject.layer)) != 0) && timeSinceLastAttack >= 1.0f / monsterBlueprint.atkspeed)
             {
-                playerCharacter.TakeDamage(monsterBlueprint.atk);
-                timeSinceLastAttack = Mathf.Repeat(timeSinceLastAttack, 1.0f/monsterBlueprint.atkspeed);
+                // Get the actual character being hit from the collision
+                Character hitCharacter = col.collider.GetComponentInParent<Character>();
+                if (hitCharacter != null)
+                {
+                    hitCharacter.TakeDamage(monsterBlueprint.atk);
+                }
+                timeSinceLastAttack = Mathf.Repeat(timeSinceLastAttack, 1.0f / monsterBlueprint.atkspeed);
             }
         }
     }

@@ -73,13 +73,13 @@ namespace Vampire
             // Ensure colliders are enabled and sized correctly
             monsterHitbox.enabled = true;
             monsterHitbox.size = monsterSpriteRenderer.bounds.size;
-            monsterHitbox.offset = Vector2.up * monsterHitbox.size.y/2;
-            monsterLegsCollider.radius = monsterHitbox.size.x/2.5f;
+            monsterHitbox.offset = Vector2.up * monsterHitbox.size.y / 2;
+            monsterLegsCollider.radius = monsterHitbox.size.x / 2.5f;
             centerTransform = (new GameObject("Center Transform")).transform;
             centerTransform.SetParent(transform);
             centerTransform.position = transform.position + (Vector3)monsterHitbox.offset;
             // Set the drag based on acceleration and movespeed
-            float spd = Random.Range(monsterBlueprint.movespeed-0.1f, monsterBlueprint.movespeed+0.1f);
+            float spd = Random.Range(monsterBlueprint.movespeed - 0.1f, monsterBlueprint.movespeed + 0.1f);
             rb.linearDamping = monsterBlueprint.acceleration / (spd * spd);
             // Reset the velocity
             rb.linearVelocity = Vector2.zero;
@@ -88,13 +88,45 @@ namespace Vampire
 
         protected virtual void Update()
         {
-            // Direction
-            monsterSpriteRenderer.flipX = ((playerCharacter.transform.position.x - rb.position.x) < 0);
+            // Direction - use nearest player for sprite flip
+            Character nearest = GetNearestPlayer();
+            if (nearest != null)
+            {
+                monsterSpriteRenderer.flipX = ((nearest.transform.position.x - rb.position.x) < 0);
+            }
         }
 
         protected virtual void FixedUpdate()
         {
 
+        }
+
+        protected Character GetNearestPlayer()
+        {
+            // Find all characters in the scene
+            Character[] allPlayers = UnityEngine.Object.FindObjectsByType<Character>(FindObjectsSortMode.None);
+
+            if (allPlayers.Length == 0)
+                return playerCharacter; // fallback
+
+            if (allPlayers.Length == 1)
+                return allPlayers[0];
+
+            // Find the closest player
+            Character nearestPlayer = allPlayers[0];
+            float minDistance = Vector2.Distance(transform.position, nearestPlayer.transform.position);
+
+            for (int i = 1; i < allPlayers.Length; i++)
+            {
+                float distance = Vector2.Distance(transform.position, allPlayers[i].transform.position);
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                    nearestPlayer = allPlayers[i];
+                }
+            }
+
+            return nearestPlayer;
         }
 
         public override void Knockback(Vector2 knockback)
@@ -141,7 +173,7 @@ namespace Vampire
                 DropLoot();
 
             if (deathParticles != null)
-            {       
+            {
                 deathParticles.Play();
             }
 
