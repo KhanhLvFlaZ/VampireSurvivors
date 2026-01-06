@@ -22,6 +22,8 @@ namespace Vampire
         [SerializeField] protected ParticleSystem dustParticles;
         [SerializeField] protected Material defaultMaterial, hitMaterial, deathMaterial;
         [SerializeField] protected ParticleSystem deathParticles;
+        [Header("Overrides")]
+        [SerializeField] private CharacterBlueprint blueprintOverride; // Optional per-instance override for visuals/stats
         protected CharacterBlueprint characterBlueprint;
         protected UpgradeableMovementSpeed movementSpeed;
         protected UpgradeableArmor armor;
@@ -42,13 +44,13 @@ namespace Vampire
         protected CoroutineQueue coroutineQueue;
         protected Coroutine hitAnimationCoroutine = null;
         protected Vector2 moveDirection;
-        public Vector2 LookDirection 
-        { 
-            get { return lookDirection; } 
-            set 
+        public Vector2 LookDirection
+        {
+            get { return lookDirection; }
+            set
             {
                 if (value != Vector2.zero)
-                    lookDirection = value; 
+                    lookDirection = value;
             }
         }
         public Transform CenterTransform { get => centerTransform; }
@@ -72,7 +74,8 @@ namespace Vampire
             zPositioner = gameObject.AddComponent<ZPositioner>();
             spriteAnimator = GetComponentInChildren<SpriteAnimator>();
             spriteRenderer = spriteAnimator.GetComponent<SpriteRenderer>();
-            characterBlueprint = CrossSceneData.CharacterBlueprint;
+            // Prefer per-instance override; fallback to global selection
+            characterBlueprint = blueprintOverride != null ? blueprintOverride : CrossSceneData.CharacterBlueprint;
         }
 
         public virtual void Init(EntityManager entityManager, AbilityManager abilityManager, StatsManager statsManager)
@@ -120,7 +123,7 @@ namespace Vampire
             else
                 StopWalkAnimation();
             if (alive)
-                rb.linearVelocity += moveDirection * characterBlueprint.acceleration * Time.deltaTime;
+                rb.linearVelocity += moveDirection * characterBlueprint.acceleration * Time.fixedDeltaTime;
         }
 
         public void GainExp(float exp)
@@ -229,7 +232,7 @@ namespace Vampire
             while (t < 1)
             {
                 spriteRenderer.sharedMaterial = deathMaterial;
-                deathParticles.transform.position = transform.position + Vector3.up * height * (1-t);
+                deathParticles.transform.position = transform.position + Vector3.up * height * (1 - t);
                 deathMaterial.SetFloat("_Wipe", t);
                 t += Time.deltaTime;
                 yield return null;

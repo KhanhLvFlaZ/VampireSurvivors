@@ -19,7 +19,19 @@ namespace Vampire
         void LateUpdate()
         {
             Vector3 temp = transform.position;
-            temp.z = scale*((manuallySetZ ? manualY : temp.y)-playerTransform.position.y);
+
+            if (playerTransform == null)
+            {
+                var found = GameObject.FindWithTag("Player");
+                if (found != null)
+                {
+                    playerTransform = found.transform;
+                }
+            }
+
+            float playerY = playerTransform != null ? playerTransform.position.y : 0f;
+            float baseY = manuallySetZ ? manualY : temp.y;
+            temp.z = scale * (baseY - playerY);
             transform.position = temp;
         }
 

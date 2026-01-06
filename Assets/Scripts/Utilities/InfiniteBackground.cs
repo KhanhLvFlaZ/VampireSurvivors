@@ -39,16 +39,29 @@ namespace Vampire
             float d = 0;
             while (d < distance)
             {
-                d += Time.deltaTime*16;
+                d += Time.deltaTime * 16;
                 backgroundMaterial.SetFloat("_Shockwave", d);
                 backgroundMaterial.SetVector("_PlayerPosition", playerTransform.position);
                 yield return null;
             }
             backgroundMaterial.SetFloat("_Shockwave", 0);
         }
-        
+
         private void Update()
         {
+            if (playerTransform == null)
+            {
+                var found = GameObject.FindWithTag("Player");
+                if (found != null)
+                {
+                    playerTransform = found.transform;
+                }
+                else
+                {
+                    return;
+                }
+            }
+
             Vector2 toReset = previousResetPosition - (Vector2)playerTransform.position;
             if (toReset.sqrMagnitude > resetDistance * resetDistance)
             {
@@ -62,15 +75,15 @@ namespace Vampire
         {
             backgroundMaterial.SetInt("_Resetting", 1);
             backgroundMaterial.SetVector("_TempResetOffset", toReset);
-            
+
             float t = 0;
             while (t < resetDuration)
             {
                 t += Time.deltaTime;
-                backgroundMaterial.SetFloat("_ResetBlend", t/resetDuration);
+                backgroundMaterial.SetFloat("_ResetBlend", t / resetDuration);
                 yield return null;
             }
-            
+
             // Update the reset offset
             resetOffset += toReset;
             backgroundMaterial.SetVector("_ResetOffset", resetOffset);

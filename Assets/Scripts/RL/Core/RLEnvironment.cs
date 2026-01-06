@@ -27,7 +27,6 @@ namespace Vampire.RL
         private Character playerCharacter;
         private SpatialHashGrid spatialGrid;
         private IRewardCalculator rewardCalculator;
-        [SerializeField] private Vampire.Gameplay.CoopPlayerManager coopPlayerManager;
 
         // Player behavior tracking
         private Queue<Vector2> playerPositionHistory;
@@ -81,15 +80,6 @@ namespace Vampire.RL
             this.playerCharacter = playerCharacter;
             this.spatialGrid = entityManager.Grid;
             this.rewardCalculator = rewardCalculator;
-
-            if (coopPlayerManager == null)
-            {
-                coopPlayerManager = FindObjectOfType<Vampire.Gameplay.CoopPlayerManager>();
-                if (coopPlayerManager == null)
-                {
-                    Debug.LogWarning("CoopPlayerManager not found; falling back to single-player observations.");
-                }
-            }
 
             lastPlayerPosition = playerCharacter.transform.position;
             lastObservationTime = Time.time;
@@ -297,21 +287,10 @@ namespace Vampire.RL
         private List<Character> GetActiveCharacters()
         {
             var list = new List<Character>();
-
-            if (coopPlayerManager != null)
-            {
-                foreach (var pi in coopPlayerManager.ActivePlayers)
-                {
-                    var c = pi != null ? pi.GetComponent<Character>() : null;
-                    if (c != null) list.Add(c);
-                }
-            }
-
-            if (list.Count == 0 && playerCharacter != null)
+            if (playerCharacter != null)
             {
                 list.Add(playerCharacter);
             }
-
             return list;
         }
 

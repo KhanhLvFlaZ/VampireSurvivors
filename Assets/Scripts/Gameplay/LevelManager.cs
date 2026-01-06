@@ -7,6 +7,7 @@ namespace Vampire
     {
         [SerializeField] private LevelBlueprint levelBlueprint;
         [SerializeField] private Character playerCharacter;
+        [SerializeField] private Character playerCharacter2; // Player 2 for local co-op
         [SerializeField] private EntityManager entityManager;
         [SerializeField] private AbilityManager abilityManager;
         [SerializeField] private AbilitySelectionDialog abilitySelectionDialog;
@@ -25,7 +26,7 @@ namespace Vampire
         {
             this.levelBlueprint = levelBlueprint;
             levelTime = 0;
-            
+
             // Initialize the entity manager
             entityManager.Init(this.levelBlueprint, playerCharacter, inventory, statsManager, infiniteBackground, abilitySelectionDialog);
             // Initialize the ability manager
@@ -34,6 +35,30 @@ namespace Vampire
             // Initialize the character
             playerCharacter.Init(entityManager, abilityManager, statsManager);
             playerCharacter.OnDeath.AddListener(GameOver);
+
+            // Initialize Player 2 if present (local co-op)
+            if (playerCharacter2 == null)
+            {
+                // Attempt to auto-discover a second Character in the scene
+                var characters = FindObjectsOfType<Character>(includeInactive: true);
+                foreach (var c in characters)
+                {
+                    if (c != null && c != playerCharacter)
+                    {
+                        playerCharacter2 = c;
+                        Debug.Log("[LevelManager] Auto-assigned Player 2: " + playerCharacter2.gameObject.name);
+                        break;
+                    }
+                }
+            }
+
+            if (playerCharacter2 != null)
+            {
+                playerCharacter2.Init(entityManager, abilityManager, statsManager);
+                playerCharacter2.OnDeath.AddListener(GameOver);
+                Debug.Log("[LevelManager] Player 2 initialized");
+            }
+
             // Spawn initial gems
             entityManager.SpawnGemsAroundPlayer(this.levelBlueprint.initialExpGemCount, this.levelBlueprint.initialExpGemType);
             // Spawn a singular chest
@@ -60,11 +85,11 @@ namespace Vampire
             if (levelTime < levelBlueprint.levelTime)
             {
                 timeSinceLastMonsterSpawned += Time.deltaTime;
-                float spawnRate = levelBlueprint.monsterSpawnTable.GetSpawnRate(levelTime/levelBlueprint.levelTime);
-                float monsterSpawnDelay = spawnRate > 0 ? 1.0f/spawnRate : float.PositiveInfinity;
+                float spawnRate = levelBlueprint.monsterSpawnTable.GetSpawnRate(levelTime / levelBlueprint.levelTime);
+                float monsterSpawnDelay = spawnRate > 0 ? 1.0f / spawnRate : float.PositiveInfinity;
                 if (timeSinceLastMonsterSpawned >= monsterSpawnDelay)
                 {
-                    (int monsterIndex, float hpMultiplier) = levelBlueprint.monsterSpawnTable.SelectMonsterWithHPMultiplier(levelTime/levelBlueprint.levelTime);
+                    (int monsterIndex, float hpMultiplier) = levelBlueprint.monsterSpawnTable.SelectMonsterWithHPMultiplier(levelTime / levelBlueprint.levelTime);
                     (int poolIndex, int blueprintIndex) = levelBlueprint.MonsterIndexMap[monsterIndex];
                     MonsterBlueprint monsterBlueprint = levelBlueprint.monsters[poolIndex].monsterBlueprints[blueprintIndex];
                     entityManager.SpawnMonsterRandomPosition(poolIndex, monsterBlueprint, monsterBlueprint.hp * hpMultiplier);

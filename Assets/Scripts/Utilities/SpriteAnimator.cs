@@ -35,8 +35,9 @@ namespace Vampire
 
         private void Setup()
         {
-            animationTime = useGlobalTime ? Time.time : 0;
-            currSequenceFrame = Mathf.FloorToInt(animationTime / frameTime) % spriteSequence.Length;
+            if (spriteSequence == null || spriteSequence.Length == 0 || spriteRenderer == null)
+                return;
+
             spriteRenderer.sprite = spriteSequence[currSequenceFrame];
         }
 
@@ -66,7 +67,7 @@ namespace Vampire
 
         void Update()
         {
-            if (animating)
+            if (animating && spriteSequence != null && spriteSequence.Length > 0 && spriteRenderer != null)
             {
                 animationTime = useGlobalTime ? Time.time : (animationTime + Time.deltaTime);
                 int sequenceFrame = Mathf.FloorToInt(animationTime / frameTime) % spriteSequence.Length;
