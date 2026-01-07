@@ -32,8 +32,8 @@ namespace Vampire.RL
         public event System.Action OnEpisodeReset;
 
         // Tracked agents
-        private List<RLMonster> episodeAgents = new List<RLMonster>();
-        private Dictionary<RLMonster, float> agentRewards = new Dictionary<RLMonster, float>();
+        private List<RLMonsterAgent> episodeAgents = new List<RLMonsterAgent>();
+        private Dictionary<RLMonsterAgent, float> agentRewards = new Dictionary<RLMonsterAgent, float>();
 
         public int CurrentEpisode => currentEpisodeNumber;
         public int CurrentStep => currentStep;
@@ -190,7 +190,7 @@ namespace Vampire.RL
         /// <summary>
         /// Register agent for episode tracking
         /// </summary>
-        public void RegisterAgent(RLMonster agent)
+        public void RegisterAgent(RLMonsterAgent agent)
         {
             if (agent == null || episodeAgents.Contains(agent))
                 return;
@@ -204,7 +204,7 @@ namespace Vampire.RL
         /// <summary>
         /// Unregister agent
         /// </summary>
-        public void UnregisterAgent(RLMonster agent)
+        public void UnregisterAgent(RLMonsterAgent agent)
         {
             if (agent == null)
                 return;
@@ -218,7 +218,7 @@ namespace Vampire.RL
         /// <summary>
         /// Record reward for an agent
         /// </summary>
-        public void RecordReward(RLMonster agent, float reward)
+        public void RecordReward(RLMonsterAgent agent, float reward)
         {
             if (agent == null || !agentRewards.ContainsKey(agent))
                 return;
@@ -229,7 +229,7 @@ namespace Vampire.RL
         /// <summary>
         /// Get total reward for an agent in current episode
         /// </summary>
-        public float GetAgentReward(RLMonster agent)
+        public float GetAgentReward(RLMonsterAgent agent)
         {
             return agentRewards.ContainsKey(agent) ? agentRewards[agent] : 0f;
         }
@@ -237,7 +237,7 @@ namespace Vampire.RL
         /// <summary>
         /// Reset a single agent
         /// </summary>
-        private void ResetAgent(RLMonster agent)
+        private void ResetAgent(RLMonsterAgent agent)
         {
             // Reset position
             agent.transform.position = GetRandomSpawnPosition();

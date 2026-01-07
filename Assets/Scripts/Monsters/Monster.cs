@@ -29,7 +29,9 @@ namespace Vampire
         protected Transform centerTransform;
         public Transform CenterTransform { get => centerTransform; }
         public UnityEvent<Monster> OnKilled { get; } = new UnityEvent<Monster>();
+        public UnityEvent<float> OnDamaged { get; } = new UnityEvent<float>();
         public float HP => currentHealth;
+        public bool ExternalControlEnabled { get; set; } = false;
         // Spatial Hash Grid Client Interface
         public Vector2 Position => transform.position;
         public Vector2 Size => monsterLegsCollider.bounds.size;
@@ -138,8 +140,17 @@ namespace Vampire
         {
             if (alive)
             {
+                // Check for global damage multiplier (for RL training)
+                var multiplier = RLDamageMultiplierManager.Instance;
+                if (multiplier != null)
+                {
+                    damage *= multiplier.GetDamageMultiplier();
+                }
+
                 entityManager.SpawnDamageText(monsterHitbox.transform.position, damage);
                 currentHealth -= damage;
+                // Notify listeners (e.g., RL agent) about damage taken
+                OnDamaged.Invoke(damage);
                 if (hitAnimationCoroutine != null) StopCoroutine(hitAnimationCoroutine);
                 if (knockback != default(Vector2))
                 {

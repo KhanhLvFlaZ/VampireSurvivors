@@ -70,21 +70,20 @@ namespace Vampire.RL
             if (monster == null) return;
 
             // Already RL-enabled
-            if (monster.GetComponent<RLMonster>() != null || monster is RLMonster)
+            if (monster.GetComponent<RLMonsterAgent>() != null)
                 return;
 
-            // Add RLMonster component
-            var rlMonster = monster.gameObject.AddComponent<RLMonster>();
+            // Add RLMonsterAgent component
+            var rlAgent = monster.gameObject.AddComponent<RLMonsterAgent>();
 
             // Register with RLSystem for training
             if (rlSystem != null)
             {
-                rlSystem.CreateAgentForMonster(rlMonster.RLMonsterType);
-                Debug.Log($"[MonsterRLConverter] Converted and registered: {monster.name}");
+                Debug.Log($"[MonsterRLConverter] Converted to RLMonsterAgent: {monster.name}");
             }
             else
             {
-                Debug.LogWarning($"[MonsterRLConverter] RLSystem missing, converted {monster.name} but not registered.");
+                Debug.LogWarning($"[MonsterRLConverter] RLSystem missing, converted {monster.name}.");
             }
         }
     }

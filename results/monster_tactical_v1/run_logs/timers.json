@@ -1,0 +1,54 @@
+{
+    "name": "root",
+    "metadata": {
+        "timer_format_version": "0.1.0",
+        "start_time_seconds": "1767768327",
+        "python_version": "3.9.2 (tags/v3.9.2:1a79785, Feb 19 2021, 13:44:55) [MSC v.1928 64 bit (AMD64)]",
+        "command_line_arguments": "C:\\Users\\khoil\\UnityProjects\\VampireSurvivors\\.venv\\Scripts\\mlagents-learn ml-agents-configs/monster_config.yaml --run-id monster_tactical_v1 --resume --force",
+        "mlagents_version": "0.28.0",
+        "mlagents_envs_version": "0.28.0",
+        "communication_protocol_version": "1.5.0",
+        "pytorch_version": "1.13.1+cpu",
+        "numpy_version": "1.23.5",
+        "end_time_seconds": "1767768340"
+    },
+    "total": 12.4074802,
+    "count": 1,
+    "self": 0.019454499999998376,
+    "children": {
+        "run_training.setup": {
+            "total": 0.08907770000000004,
+            "count": 1,
+            "self": 0.08907770000000004
+        },
+        "TrainerController.start_learning": {
+            "total": 12.298948000000001,
+            "count": 1,
+            "self": 0.00018679999999982044,
+            "children": {
+                "TrainerController._reset_env": {
+                    "total": 12.114367900000001,
+                    "count": 1,
+                    "self": 12.114367900000001
+                },
+                "trainer_threads": {
+                    "total": 1.300000000981072e-06,
+                    "count": 1,
+                    "self": 1.300000000981072e-06
+                },
+                "TrainerController._save_models": {
+                    "total": 0.184391999999999,
+                    "count": 1,
+                    "self": 0.0017204999999993476,
+                    "children": {
+                        "RLTrainer._checkpoint": {
+                            "total": 0.18267149999999965,
+                            "count": 1,
+                            "self": 0.18267149999999965
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

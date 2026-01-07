@@ -19,7 +19,7 @@ namespace Vampire.RL
         [SerializeField] private int checkpointInterval = 100;
 
         [Header("Training Agents")]
-        [SerializeField] private List<RLMonster> trainingAgents = new List<RLMonster>();
+        [SerializeField] private List<RLMonsterAgent> trainingAgents = new List<RLMonsterAgent>();
 
         [Header("Episode Management")]
         [SerializeField] private float episodeTimeLimit = 300f; // 5 minutes
@@ -173,14 +173,7 @@ namespace Vampire.RL
                 startTime = episodeStartTime
             };
 
-            // Enable training mode for all agents
-            foreach (var agent in trainingAgents)
-            {
-                if (agent != null)
-                {
-                    agent.IsTraining = true;
-                }
-            }
+            // ML-Agents training is managed externally; agents run inference/training via BehaviorParameters.
 
             if (autoResetOnEpisodeEnd)
             {
@@ -278,13 +271,7 @@ namespace Vampire.RL
         /// </summary>
         private void UpdateAgentPolicies()
         {
-            foreach (var agent in trainingAgents)
-            {
-                if (agent != null && agent.IsTraining)
-                {
-                    agent.UpdatePolicy();
-                }
-            }
+            // Policy updates occur via ML-Agents trainer; no per-agent UpdatePolicy calls.
         }
 
         /// <summary>
@@ -331,14 +318,7 @@ namespace Vampire.RL
         {
             Debug.Log($"Saving checkpoint at episode {currentEpisode}");
 
-            foreach (var agent in trainingAgents)
-            {
-                if (agent != null)
-                {
-                    // This would save the agent's model
-                    // Implementation in model management section
-                }
-            }
+            // Model saving handled by ML-Agents training outputs (ONNX).
         }
 
         /// <summary>
@@ -348,14 +328,7 @@ namespace Vampire.RL
         {
             Debug.Log("Saving final trained models");
 
-            foreach (var agent in trainingAgents)
-            {
-                if (agent != null)
-                {
-                    // This would save the final model
-                    // Implementation in model management section
-                }
-            }
+            // Final model saving handled externally.
         }
 
         /// <summary>
@@ -402,7 +375,7 @@ namespace Vampire.RL
         /// <summary>
         /// Add agent to training session
         /// </summary>
-        public void AddTrainingAgent(RLMonster agent)
+        public void AddTrainingAgent(RLMonsterAgent agent)
         {
             if (!trainingAgents.Contains(agent))
             {
@@ -414,7 +387,7 @@ namespace Vampire.RL
         /// <summary>
         /// Remove agent from training session
         /// </summary>
-        public void RemoveTrainingAgent(RLMonster agent)
+        public void RemoveTrainingAgent(RLMonsterAgent agent)
         {
             if (trainingAgents.Contains(agent))
             {

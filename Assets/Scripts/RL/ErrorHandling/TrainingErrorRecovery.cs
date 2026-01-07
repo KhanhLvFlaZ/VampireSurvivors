@@ -271,7 +271,7 @@ namespace Vampire.RL
     /// </summary>
     public class InferenceErrorRecovery : MonoBehaviour, IFallbackCapable, IRecoverable
     {
-        private RLMonster rlMonster;
+        private RLMonsterAgent rlMonster;
         private FallbackAIBehavior fallbackAI;
         private bool useFallback = false;
 
@@ -285,7 +285,7 @@ namespace Vampire.RL
 
         private void Awake()
         {
-            rlMonster = GetComponent<RLMonster>();
+            rlMonster = GetComponent<RLMonsterAgent>();
             fallbackAI = GetComponent<FallbackAIBehavior>();
 
             if (fallbackAI == null)

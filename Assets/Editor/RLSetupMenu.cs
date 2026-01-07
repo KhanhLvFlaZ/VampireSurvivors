@@ -66,7 +66,7 @@ public static class RLSetupMenu
     [MenuItem("Vampire RL/Add ML-Agents Components To Selected RLMonster", true)]
     private static bool ValidateAddMLAgentsToSelected()
     {
-        return Selection.activeGameObject != null && Selection.activeGameObject.GetComponent<RLMonster>() != null;
+        return Selection.activeGameObject != null && Selection.activeGameObject.GetComponent<RLMonsterAgent>() != null;
     }
 
     [MenuItem("Vampire RL/Add ML-Agents Components To Selected RLMonster")]
@@ -75,13 +75,13 @@ public static class RLSetupMenu
         var go = Selection.activeGameObject;
         if (go == null)
         {
-            EditorUtility.DisplayDialog("Vampire RL", "Select an object with RLMonster component.", "OK");
+            EditorUtility.DisplayDialog("Vampire RL", "Select an object with RLMonsterAgent component.", "OK");
             return;
         }
 
-        if (go.GetComponent<RLMonster>() == null)
+        if (go.GetComponent<RLMonsterAgent>() == null)
         {
-            EditorUtility.DisplayDialog("Vampire RL", "Selected object must have RLMonster.", "OK");
+            EditorUtility.DisplayDialog("Vampire RL", "Selected object must have RLMonsterAgent.", "OK");
             return;
         }
 

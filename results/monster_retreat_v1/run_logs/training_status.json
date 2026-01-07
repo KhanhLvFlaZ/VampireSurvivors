@@ -1,0 +1,29 @@
+{
+    "RLMonster": {
+        "checkpoints": [
+            {
+                "steps": 125987,
+                "file_path": "results\\monster_retreat_v1\\RLMonster\\RLMonster-125987.onnx",
+                "reward": 1789.1398971676826,
+                "creation_time": 1767768694.7502809,
+                "auxillary_file_paths": [
+                    "results\\monster_retreat_v1\\RLMonster\\RLMonster-125987.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 125987,
+            "file_path": "results\\monster_retreat_v1\\RLMonster.onnx",
+            "reward": 1789.1398971676826,
+            "creation_time": 1767768694.7502809,
+            "auxillary_file_paths": [
+                "results\\monster_retreat_v1\\RLMonster\\RLMonster-125987.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "0.28.0",
+        "torch_version": "1.13.1+cpu"
+    }
+}

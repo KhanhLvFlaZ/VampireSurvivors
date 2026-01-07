@@ -4,18 +4,18 @@ using System.Collections.Generic;
 namespace Vampire.RL
 {
     /// <summary>
-    /// Extension methods for RLMonster to support RL integration
+    /// Extension methods for RLMonsterAgent to support RL integration
     /// Requirement: 1.1 - RL monster agent initialization, 1.5 - Multi-agent coordination
     /// </summary>
     public static class RLMonsterExtensions
     {
-        private static Dictionary<RLMonster, RLMonsterRuntimeData> runtimeData = new Dictionary<RLMonster, RLMonsterRuntimeData>();
+        private static Dictionary<RLMonsterAgent, RLMonsterRuntimeData> runtimeData = new Dictionary<RLMonsterAgent, RLMonsterRuntimeData>();
 
         /// <summary>
-        /// Initialize RLMonster with blueprint configuration
+        /// Initialize RLMonsterAgent with blueprint configuration
         /// Requirement: 1.1
         /// </summary>
-        public static void InitializeRL(this RLMonster monster, RLMonsterBlueprint blueprint)
+        public static void InitializeRL(this RLMonsterAgent monster, RLMonsterBlueprint blueprint)
         {
             if (monster == null || blueprint == null)
                 return;
@@ -37,24 +37,15 @@ namespace Vampire.RL
             data.networkConfig = blueprint.GetNetworkConfiguration();
             data.adaptiveConfig = blueprint.GetAdaptiveLearningConfiguration();
 
-            // Apply training settings if enabled
-            if (blueprint.EnableTraining)
-            {
-                monster.IsTraining = true;
-            }
-
-            // Load pre-trained model if specified
-            if (blueprint.UsePreTrainedModel && !string.IsNullOrEmpty(blueprint.PreTrainedModelPath))
-            {
-                monster.LoadBehaviorProfile(blueprint.PreTrainedModelPath);
-            }
+            // Training/inference and model assignment should be configured via BehaviorParameters in Unity
+            // This extension stores metadata only; agent behavior is managed by ML-Agents.
         }
 
         /// <summary>
         /// Set difficulty level for this monster
         /// Adjusts behavior parameters based on difficulty
         /// </summary>
-        public static void SetDifficultyLevel(this RLMonster monster, DifficultyLevel difficulty)
+        public static void SetDifficultyLevel(this RLMonsterAgent monster, DifficultyLevel difficulty)
         {
             if (monster == null || !runtimeData.TryGetValue(monster, out var data))
                 return;
@@ -115,7 +106,7 @@ namespace Vampire.RL
         /// <summary>
         /// Get current RL blueprint for monster
         /// </summary>
-        public static RLMonsterBlueprint GetRLBlueprint(this RLMonster monster)
+        public static RLMonsterBlueprint GetRLBlueprint(this RLMonsterAgent monster)
         {
             if (monster != null && runtimeData.TryGetValue(monster, out var data))
             {
@@ -127,7 +118,7 @@ namespace Vampire.RL
         /// <summary>
         /// Get current difficulty level
         /// </summary>
-        public static DifficultyLevel GetCurrentDifficulty(this RLMonster monster)
+        public static DifficultyLevel GetCurrentDifficulty(this RLMonsterAgent monster)
         {
             if (monster != null && runtimeData.TryGetValue(monster, out var data))
             {
@@ -139,7 +130,7 @@ namespace Vampire.RL
         /// <summary>
         /// Apply adaptive learning configuration
         /// </summary>
-        public static void ApplyAdaptiveLearning(this RLMonster monster, AdaptiveLearningConfiguration config)
+        public static void ApplyAdaptiveLearning(this RLMonsterAgent monster, AdaptiveLearningConfiguration config)
         {
             if (monster == null || config == null)
                 return;
@@ -153,7 +144,7 @@ namespace Vampire.RL
         /// <summary>
         /// Cleanup runtime data when monster is destroyed
         /// </summary>
-        public static void CleanupRL(this RLMonster monster)
+        public static void CleanupRL(this RLMonsterAgent monster)
         {
             if (monster != null)
             {

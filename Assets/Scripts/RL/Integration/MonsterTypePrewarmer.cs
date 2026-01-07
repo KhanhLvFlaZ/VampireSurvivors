@@ -29,7 +29,7 @@ namespace Vampire.RL
         public class MonsterTypePrefab
         {
             public MonsterType type;
-            public GameObject prefab; // Prefab should include RLMonster configured for this type
+            public GameObject prefab; // Prefab should include RLMonsterAgent configured for this type
         }
 
         private void Awake()
@@ -86,12 +86,12 @@ namespace Vampire.RL
                     var go = Instantiate(prefab, pos, Quaternion.identity);
                     go.name = $"Prewarm_{t}";
 
-                    // Ensure RLMonster exists; if not present, try to add (type must be set on prefab for best results)
-                    var rlMonster = go.GetComponent<RLMonster>() ?? go.AddComponent<RLMonster>();
+                    // Ensure RLMonsterAgent exists; if not present, add
+                    var rlAgent = go.GetComponent<RLMonsterAgent>() ?? go.AddComponent<RLMonsterAgent>();
 
-                    // Converter will auto-register; but also nudge RLSystem just in case
+                    // Converter will auto-register; also nudge RLSystem for this type
                     if (rlSystem != null)
-                        rlSystem.CreateAgentForMonster(rlMonster.RLMonsterType);
+                        rlSystem.CreateAgentForMonster(t);
 
                     if (destroySpawnedAfterSeconds)
                         Destroy(go, destroyDelaySeconds);

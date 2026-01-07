@@ -32,7 +32,7 @@ namespace Vampire.RL.Integration
 
         private RLSystem rlSystem;
         private IBehaviorProfileManager behaviorProfileManager;
-        private List<RLMonster> activRLMonsters;
+        private List<RLMonsterAgent> activRLMonsters;
         private PerformanceMonitor performanceMonitor;
         private EpisodeMetricsRecorder metricsRecorder;
         private EvaluationScenarioManager evaluationManager;
@@ -97,7 +97,7 @@ namespace Vampire.RL.Integration
                 behaviorProfileManager.Initialize(playerProfileId);
 
                 // Initialize monster list
-                activRLMonsters = new List<RLMonster>();
+                activRLMonsters = new List<RLMonsterAgent>();
 
                 // Initialize performance monitor
                 performanceMonitor = GetComponent<PerformanceMonitor>();
@@ -145,7 +145,7 @@ namespace Vampire.RL.Integration
         /// Spawn an RL-enabled monster
         /// Requirements: 1.1, 1.5
         /// </summary>
-        public RLMonster SpawnRLMonster(int blueprintIndex, Vector3 spawnPosition, float hpMultiplier = 1f)
+        public RLMonsterAgent SpawnRLMonster(int blueprintIndex, Vector3 spawnPosition, float hpMultiplier = 1f)
         {
             if (!enableMonsterRL || rlSystem == null || !rlSystem.IsEnabled)
                 return null;
@@ -163,7 +163,7 @@ namespace Vampire.RL.Integration
                 rlMonsterGO.transform.position = spawnPosition;
 
                 // Create RLMonster component
-                var rlMonster = rlMonsterGO.AddComponent<RLMonster>();
+                var rlMonster = rlMonsterGO.AddComponent<RLMonsterAgent>();
 
                 // Initialize with RL data
                 var actionSpace = ActionSpace.CreateDefault();

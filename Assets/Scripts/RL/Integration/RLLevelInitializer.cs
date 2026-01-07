@@ -106,7 +106,7 @@ namespace Vampire.RL
         /// <summary>
         /// Handle RL monster spawned event
         /// </summary>
-        private void HandleRLMonsterSpawned(RLMonster monster)
+        private void HandleRLMonsterSpawned(RLMonsterAgent monster)
         {
             if (monster == null)
                 return;
@@ -121,7 +121,7 @@ namespace Vampire.RL
         /// <summary>
         /// Handle RL monster despawned event
         /// </summary>
-        private void HandleRLMonsterDespawned(RLMonster monster)
+        private void HandleRLMonsterDespawned(RLMonsterAgent monster)
         {
             if (monster == null)
                 return;
@@ -160,7 +160,7 @@ namespace Vampire.RL
         /// <summary>
         /// Spawn an RL-enabled monster
         /// </summary>
-        public RLMonster SpawnRLMonster(RLMonsterBlueprint blueprint, Vector2 position)
+        public RLMonsterAgent SpawnRLMonster(RLMonsterBlueprint blueprint, Vector2 position)
         {
             if (!initialized || rlIntegration == null)
             {
@@ -174,7 +174,7 @@ namespace Vampire.RL
         /// <summary>
         /// Spawn RL monster at random position
         /// </summary>
-        public RLMonster SpawnRLMonsterRandomPosition(RLMonsterBlueprint blueprint)
+        public RLMonsterAgent SpawnRLMonsterRandomPosition(RLMonsterBlueprint blueprint)
         {
             if (!initialized || rlIntegration == null)
             {
@@ -210,10 +210,10 @@ namespace Vampire.RL
         /// <summary>
         /// Get all active RL monsters
         /// </summary>
-        public RLMonster[] GetActiveRLMonsters()
+        public RLMonsterAgent[] GetActiveRLMonsters()
         {
             if (!initialized || rlIntegration == null)
-                return new RLMonster[0];
+                return new RLMonsterAgent[0];
 
             return rlIntegration.GetActiveRLMonsters();
         }

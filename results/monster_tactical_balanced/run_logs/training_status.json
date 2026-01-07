@@ -1,0 +1,38 @@
+{
+    "RLMonster": {
+        "checkpoints": [
+            {
+                "steps": 499972,
+                "file_path": "results\\monster_tactical_balanced\\RLMonster\\RLMonster-499972.onnx",
+                "reward": null,
+                "creation_time": 1767771041.2117546,
+                "auxillary_file_paths": [
+                    "results\\monster_tactical_balanced\\RLMonster\\RLMonster-499972.pt"
+                ]
+            },
+            {
+                "steps": 684444,
+                "file_path": "results\\monster_tactical_balanced\\RLMonster\\RLMonster-684444.onnx",
+                "reward": null,
+                "creation_time": 1767771280.6118267,
+                "auxillary_file_paths": [
+                    "results\\monster_tactical_balanced\\RLMonster\\RLMonster-684444.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 684444,
+            "file_path": "results\\monster_tactical_balanced\\RLMonster.onnx",
+            "reward": null,
+            "creation_time": 1767771280.6118267,
+            "auxillary_file_paths": [
+                "results\\monster_tactical_balanced\\RLMonster\\RLMonster-684444.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "0.28.0",
+        "torch_version": "1.13.1+cpu"
+    }
+}

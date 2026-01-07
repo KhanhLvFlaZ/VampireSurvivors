@@ -12,8 +12,8 @@ namespace Vampire.RL
         [SerializeField] private GameObject monsterPoolParent;
 
         private EntityManager entityManager;
-        private Dictionary<string, Stack<RLMonster>> poolsByBlueprint = new Dictionary<string, Stack<RLMonster>>();
-        private Dictionary<RLMonster, string> blueprintByInstance = new Dictionary<RLMonster, string>();
+        private Dictionary<string, Stack<RLMonsterAgent>> poolsByBlueprint = new Dictionary<string, Stack<RLMonsterAgent>>();
+        private Dictionary<RLMonsterAgent, string> blueprintByInstance = new Dictionary<RLMonsterAgent, string>();
         private Dictionary<string, RLMonsterBlueprint> blueprintCache = new Dictionary<string, RLMonsterBlueprint>();
 
         /// <summary>
@@ -27,7 +27,7 @@ namespace Vampire.RL
         /// <summary>
         /// Get or create pool for RL blueprint
         /// </summary>
-        public Stack<RLMonster> GetOrCreatePool(RLMonsterBlueprint blueprint)
+        public Stack<RLMonsterAgent> GetOrCreatePool(RLMonsterBlueprint blueprint)
         {
             if (blueprint == null)
             {
@@ -39,7 +39,7 @@ namespace Vampire.RL
 
             if (!poolsByBlueprint.TryGetValue(key, out var pool))
             {
-                pool = new Stack<RLMonster>();
+                pool = new Stack<RLMonsterAgent>();
                 poolsByBlueprint[key] = pool;
                 blueprintCache[key] = blueprint;
 
@@ -54,13 +54,13 @@ namespace Vampire.RL
         /// Get an RL monster instance from pool
         /// Requirement: 1.1
         /// </summary>
-        public RLMonster GetMonster(RLMonsterBlueprint blueprint)
+        public RLMonsterAgent GetMonster(RLMonsterBlueprint blueprint)
         {
             var pool = GetOrCreatePool(blueprint);
             if (pool == null)
                 return null;
 
-            RLMonster monster;
+            RLMonsterAgent monster;
 
             if (pool.Count > 0)
             {
@@ -84,7 +84,7 @@ namespace Vampire.RL
         /// <summary>
         /// Return RL monster to pool
         /// </summary>
-        public void ReleaseMonster(RLMonster monster)
+        public void ReleaseMonster(RLMonsterAgent monster)
         {
             if (monster == null)
                 return;
@@ -102,7 +102,7 @@ namespace Vampire.RL
         /// <summary>
         /// Create a new RL monster instance
         /// </summary>
-        private RLMonster CreateMonsterInstance(RLMonsterBlueprint blueprint)
+        private RLMonsterAgent CreateMonsterInstance(RLMonsterBlueprint blueprint)
         {
             // This would require having a monster prefab that includes RLMonster component
             // For now, return null - the actual implementation depends on prefab setup

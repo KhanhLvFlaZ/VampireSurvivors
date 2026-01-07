@@ -13,7 +13,7 @@ namespace Vampire.RL
     {
         private EntityManager entityManager;
         private RLLevelConfiguration rlLevelConfig;
-        private List<RLMonster> activeRLMonsters = new List<RLMonster>();
+        private List<RLMonsterAgent> activeRLMonsters = new List<RLMonsterAgent>();
         private Dictionary<string, int> rlMonsterPoolIndices = new Dictionary<string, int>();
         private int baseMonsterPoolCount;
 
@@ -26,8 +26,8 @@ namespace Vampire.RL
         private float coordinationUpdateInterval = 0.1f;
 
         // Event system
-        public delegate void RLMonsterSpawnedHandler(RLMonster monster);
-        public delegate void RLMonsterDespawnedHandler(RLMonster monster);
+        public delegate void RLMonsterSpawnedHandler(RLMonsterAgent monster);
+        public delegate void RLMonsterDespawnedHandler(RLMonsterAgent monster);
         public delegate void RLAgentCountChangedHandler(int newCount);
 
         public event RLMonsterSpawnedHandler OnRLMonsterSpawned;
@@ -35,7 +35,7 @@ namespace Vampire.RL
         public event RLAgentCountChangedHandler OnRLAgentCountChanged;
 
         public int CurrentRLAgentCount => currentRLAgentCount;
-        public RLMonster[] ActiveRLMonsters => activeRLMonsters.ToArray();
+        public RLMonsterAgent[] ActiveRLMonsters => activeRLMonsters.ToArray();
         public RLLevelConfiguration RLLevelConfig => rlLevelConfig;
 
         private void Awake()
@@ -81,7 +81,7 @@ namespace Vampire.RL
         /// Returns null if RL is not enabled or agent limit exceeded
         /// Requirement: 1.1
         /// </summary>
-        public RLMonster SpawnRLMonster(RLMonsterBlueprint rlBlueprint, Vector2 position)
+        public RLMonsterAgent SpawnRLMonster(RLMonsterBlueprint rlBlueprint, Vector2 position)
         {
             if (rlLevelConfig == null || !rlLevelConfig.EnableRLForLevel)
                 return null;
@@ -114,10 +114,10 @@ namespace Vampire.RL
             Monster baseMonster = entityManager.SpawnMonster(poolIndex, position, rlBlueprint);
 
             // Convert to RL monster if needed
-            RLMonster rlMonster = baseMonster as RLMonster;
+            RLMonsterAgent rlMonster = baseMonster.GetComponent<RLMonsterAgent>();
             if (rlMonster == null)
             {
-                // If the monster isn't an RL monster, try to initialize it with RL behavior
+                // Attach RLMonsterAgent and initialize linkage
                 rlMonster = SetupRLBehavior(baseMonster, rlBlueprint);
             }
 
@@ -145,7 +145,7 @@ namespace Vampire.RL
         /// Spawn RL monster at random position
         /// Requirement: 1.1
         /// </summary>
-        public RLMonster SpawnRLMonsterRandomPosition(RLMonsterBlueprint rlBlueprint)
+        public RLMonsterAgent SpawnRLMonsterRandomPosition(RLMonsterBlueprint rlBlueprint)
         {
             if (rlLevelConfig == null || !rlLevelConfig.EnableRLForLevel)
                 return null;
@@ -158,29 +158,30 @@ namespace Vampire.RL
         /// <summary>
         /// Convert standard monster to RL monster
         /// </summary>
-        private RLMonster SetupRLBehavior(Monster baseMonster, RLMonsterBlueprint rlBlueprint)
+        private RLMonsterAgent SetupRLBehavior(Monster baseMonster, RLMonsterBlueprint rlBlueprint)
         {
             // This would require adding an RLMonster component to the spawned monster
             // For now, we assume the prefab already includes RLMonster component
-            RLMonster rlMonster = baseMonster.GetComponent<RLMonster>();
-            if (rlMonster != null)
+            RLMonsterAgent agent = baseMonster.GetComponent<RLMonsterAgent>();
+            if (agent == null)
             {
-                // Configure RL monster from blueprint
-                rlMonster.IsTraining = rlBlueprint.EnableTraining;
-
-                // Load model if pre-trained
-                if (rlBlueprint.UsePreTrainedModel && !string.IsNullOrEmpty(rlBlueprint.PreTrainedModelPath))
-                {
-                    rlMonster.LoadBehaviorProfile(rlBlueprint.PreTrainedModelPath);
-                }
+                agent = baseMonster.gameObject.AddComponent<RLMonsterAgent>();
             }
-            return rlMonster;
+
+            // Link with base monster and entity manager
+            agent.LinkWithMonster(baseMonster);
+            agent.SetEntityManager(entityManager);
+
+            // Training/inference mode can be controlled via BehaviorParameters in Unity
+            // rlBlueprint fields (EnableTraining, UsePreTrainedModel, PreTrainedModelPath) should be applied via inspector/config
+
+            return agent;
         }
 
         /// <summary>
         /// Despawn RL monster and update tracking
         /// </summary>
-        public void DespawnRLMonster(RLMonster rlMonster, bool killedByPlayer = true)
+        public void DespawnRLMonster(RLMonsterAgent rlMonster, bool killedByPlayer = true)
         {
             if (rlMonster == null)
                 return;
@@ -201,9 +202,10 @@ namespace Vampire.RL
         /// <summary>
         /// Get RL monster by instance
         /// </summary>
-        public RLMonster GetRLMonster(Monster monster)
+        public RLMonsterAgent GetRLMonster(Monster monster)
         {
-            return activeRLMonsters.FirstOrDefault(rlm => rlm == monster as RLMonster);
+            if (monster == null) return null;
+            return monster.GetComponent<RLMonsterAgent>();
         }
 
         /// <summary>
@@ -233,7 +235,8 @@ namespace Vampire.RL
 
             foreach (var rlMonster in activeRLMonsters)
             {
-                rlMonster.SetDifficultyLevel(difficulty);
+                // Adjust difficulty via external systems or agent parameters as needed
+                // No direct method on RLMonsterAgent; implement as needed
             }
         }
 
@@ -258,7 +261,7 @@ namespace Vampire.RL
         /// <summary>
         /// Get all active RL monsters
         /// </summary>
-        public RLMonster[] GetActiveRLMonsters()
+        public RLMonsterAgent[] GetActiveRLMonsters()
         {
             return activeRLMonsters.ToArray();
         }
@@ -302,7 +305,7 @@ namespace Vampire.RL
     {
         private int maxAgents;
         private CoordinationStrategy strategy;
-        private Dictionary<RLMonster, AgentCoordinationData> agentData = new Dictionary<RLMonster, AgentCoordinationData>();
+        private Dictionary<RLMonsterAgent, AgentCoordinationData> agentData = new Dictionary<RLMonsterAgent, AgentCoordinationData>();
 
         public RLMonsterCoordinationPool(int maxAgents, CoordinationStrategy strategy)
         {
@@ -310,7 +313,7 @@ namespace Vampire.RL
             this.strategy = strategy;
         }
 
-        public void RegisterAgent(RLMonster agent)
+        public void RegisterAgent(RLMonsterAgent agent)
         {
             if (!agentData.ContainsKey(agent))
             {
@@ -318,12 +321,12 @@ namespace Vampire.RL
             }
         }
 
-        public void UnregisterAgent(RLMonster agent)
+        public void UnregisterAgent(RLMonsterAgent agent)
         {
             agentData.Remove(agent);
         }
 
-        public void UpdateCoordination(List<RLMonster> activeMonsters)
+        public void UpdateCoordination(List<RLMonsterAgent> activeMonsters)
         {
             switch (strategy)
             {
@@ -355,7 +358,7 @@ namespace Vampire.RL
             }
         }
 
-        private void UpdateBasicCoordination(List<RLMonster> agents)
+        private void UpdateBasicCoordination(List<RLMonsterAgent> agents)
         {
             // Agents follow a leader
             if (agents.Count > 0)
@@ -372,7 +375,7 @@ namespace Vampire.RL
             }
         }
 
-        private void UpdateFlankCoordination(List<RLMonster> agents)
+        private void UpdateFlankCoordination(List<RLMonsterAgent> agents)
         {
             // Agents position themselves to attack from sides
             for (int i = 0; i < agents.Count; i++)
@@ -397,27 +400,27 @@ namespace Vampire.RL
             }
         }
 
-        private void UpdateSurroundCoordination(List<RLMonster> agents)
+        private void UpdateSurroundCoordination(List<RLMonsterAgent> agents)
         {
             // Agents encircle targets
         }
 
-        private void UpdateCrossfireCoordination(List<RLMonster> agents)
+        private void UpdateCrossfireCoordination(List<RLMonsterAgent> agents)
         {
             // Ranged agents create crossfire patterns
         }
 
-        private void UpdateSequentialAttackCoordination(List<RLMonster> agents)
+        private void UpdateSequentialAttackCoordination(List<RLMonsterAgent> agents)
         {
             // Agents attack in sequence
         }
 
-        private void UpdateZoneControlCoordination(List<RLMonster> agents)
+        private void UpdateZoneControlCoordination(List<RLMonsterAgent> agents)
         {
             // Agents control specific areas
         }
 
-        private void UpdateOverwhelmCoordination(List<RLMonster> agents)
+        private void UpdateOverwhelmCoordination(List<RLMonsterAgent> agents)
         {
             // All agents attack together for overwhelming force
         }
@@ -433,7 +436,7 @@ namespace Vampire.RL
     /// </summary>
     public class AgentCoordinationData
     {
-        public List<RLMonster> nearbyAllies = new List<RLMonster>();
+        public List<RLMonsterAgent> nearbyAllies = new List<RLMonsterAgent>();
         public bool isLeader = false;
         public Vector2 targetCoordinationDirection = Vector2.zero;
         public float coordinationIntensity = 1.0f;

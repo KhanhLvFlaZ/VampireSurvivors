@@ -5,23 +5,23 @@ namespace Vampire.RL
 {
     /// <summary>
     /// Error handling extensions for RL components
-    /// Adds graceful degradation and fallback support to RLMonster and RLEnvironment
+    /// Adds graceful degradation and fallback support to RLMonsterAgent and RLEnvironment
     /// Requirement: 5.1, 5.2
     /// </summary>
     public static class RLComponentErrorHandlingExtensions
     {
         /// <summary>
-        /// Safe initialization wrapper for RLMonster
+        /// Safe initialization wrapper for RLMonsterAgent
         /// Catches initialization errors and falls back gracefully
         /// </summary>
-        public static bool SafeInitializeRLMonster(this RLMonster monster, RLMonsterBlueprint blueprint)
+        public static bool SafeInitializeRLMonster(this RLMonsterAgent monster, RLMonsterBlueprint blueprint)
         {
             if (monster == null)
             {
                 RLErrorHandler.Instance.HandleError(
                     ErrorType.Critical,
                     null,
-                    "RLMonster is null"
+                    "RLMonsterAgent is null"
                 );
                 return false;
             }
@@ -50,8 +50,7 @@ namespace Vampire.RL
                     return false;
                 }
 
-                // Initialize by calling the standard Init method on Monster
-                // This is already implemented in RLMonster through the override
+                // RLMonsterAgent initializes via Unity ML-Agents lifecycle; ensure linkage if needed
                 return true;
             }
             catch (Exception ex)
@@ -59,7 +58,7 @@ namespace Vampire.RL
                 RLErrorHandler.Instance.HandleError(
                     ErrorType.Critical,
                     null,
-                    $"Failed to initialize RLMonster: {ex.Message}",
+                    $"Failed to initialize RLMonsterAgent: {ex.Message}",
                     ex
                 );
                 return false;
@@ -70,7 +69,7 @@ namespace Vampire.RL
         /// Safe state observation wrapper
         /// Validates and sanitizes observed state
         /// </summary>
-        public static RLGameState SafeGetObservation(this RLEnvironment environment, RLMonster monster)
+        public static RLGameState SafeGetObservation(this RLEnvironment environment, RLMonsterAgent monster)
         {
             if (environment == null)
             {
@@ -87,7 +86,7 @@ namespace Vampire.RL
                 RLErrorHandler.Instance.HandleError(
                     ErrorType.Warning,
                     null,
-                    "RLMonster is null, returning default state"
+                    "RLMonsterAgent is null, returning default state"
                 );
                 return RLGameState.CreateDefault();
             }
@@ -129,14 +128,14 @@ namespace Vampire.RL
         /// Safe action execution wrapper
         /// Handles execution errors and falls back to safe behavior
         /// </summary>
-        public static bool SafeExecuteAction(this RLMonster monster, int actionIndex)
+        public static bool SafeExecuteAction(this RLMonsterAgent monster, int actionIndex)
         {
             if (monster == null)
             {
                 RLErrorHandler.Instance.HandleError(
                     ErrorType.Critical,
                     null,
-                    "RLMonster is null, cannot execute action"
+                    "RLMonsterAgent is null, cannot execute action"
                 );
                 return false;
             }
@@ -154,7 +153,7 @@ namespace Vampire.RL
                     actionIndex = 0;
                 }
 
-                // Action execution is handled within RLMonster's Update method
+                // Action execution for RLMonsterAgent occurs within OnActionReceived
                 return true;
             }
             catch (Exception ex)
@@ -296,7 +295,7 @@ namespace Vampire.RL
     /// </summary>
     public class RLErrorRecoveryCoordinator : MonoBehaviour, IRecoverable, IConfigurable
     {
-        private RLMonster rlMonster;
+        private RLMonsterAgent rlMonsterAgent;
         private FallbackAIBehavior fallbackAI;
         private RLEntityIntegration rlIntegration;
         private bool isRecovering = false;
@@ -306,7 +305,7 @@ namespace Vampire.RL
 
         private void Awake()
         {
-            rlMonster = GetComponent<RLMonster>();
+            rlMonsterAgent = GetComponent<RLMonsterAgent>();
             fallbackAI = GetComponent<FallbackAIBehavior>();
             rlIntegration = GetComponentInParent<RLEntityIntegration>();
         }
@@ -330,7 +329,7 @@ namespace Vampire.RL
         private void HandleErrorEvent(RLError error)
         {
             // Check if this error is relevant to this monster
-            if (rlMonster == null || !rlMonster.isActiveAndEnabled)
+            if (rlMonsterAgent == null || !rlMonsterAgent.isActiveAndEnabled)
                 return;
 
             // Attempt recovery based on error type
@@ -352,8 +351,8 @@ namespace Vampire.RL
             Debug.Log($"Attempting recovery for {gameObject.name} (attempt {recoveryAttempts}/{maxRecoveryAttempts}) - Error: {error.errorType}");
 
             // Step 1: Disable RL temporarily
-            if (rlMonster != null)
-                rlMonster.IsTraining = false;
+            if (rlMonsterAgent != null)
+                rlMonsterAgent.enabled = false;
 
             // Step 2: Enable fallback behavior
             if (fallbackAI != null)
@@ -370,9 +369,9 @@ namespace Vampire.RL
             yield return new WaitForSeconds(1f);
 
             // Step 4: Attempt to re-enable RL
-            if (rlMonster != null && recoveryAttempts < maxRecoveryAttempts)
+            if (rlMonsterAgent != null && recoveryAttempts < maxRecoveryAttempts)
             {
-                rlMonster.IsTraining = true;
+                rlMonsterAgent.enabled = true;
                 Debug.Log($"Re-enabled RL for {gameObject.name} after recovery attempt {recoveryAttempts}");
             }
             else
@@ -396,8 +395,8 @@ namespace Vampire.RL
             recoveryAttempts = 0;
             isRecovering = false;
 
-            if (rlMonster != null)
-                rlMonster.IsTraining = true;
+            if (rlMonsterAgent != null)
+                rlMonsterAgent.enabled = true;
 
             if (fallbackAI != null)
                 fallbackAI.DisableFallback();

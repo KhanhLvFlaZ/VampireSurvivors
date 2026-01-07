@@ -24,6 +24,12 @@ namespace Vampire
         protected override void FixedUpdate()
         {
             base.FixedUpdate();
+            // If externally controlled (e.g., by RL agent), skip native chase AI
+            if (ExternalControlEnabled)
+            {
+                entityManager.Grid.UpdateClient(this);
+                return;
+            }
             // Chase the nearest player
             Character targetPlayer = GetNearestPlayer();
             if (targetPlayer != null)

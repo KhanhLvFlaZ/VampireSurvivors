@@ -239,17 +239,17 @@ namespace Vampire.RL
     /// </summary>
     public class MLAgentsRLAgent : Agent
     {
-        private RLMonster rlMonster;
+        private RLMonsterAgent rlMonsterAgent;
         private RLEnvironment environment;
 
         public override void Initialize()
         {
             base.Initialize();
 
-            rlMonster = GetComponent<RLMonster>();
-            if (rlMonster == null)
+            rlMonsterAgent = GetComponent<RLMonsterAgent>();
+            if (rlMonsterAgent == null)
             {
-                Debug.LogError("MLAgentsRLAgent requires RLMonster component");
+                Debug.LogError("MLAgentsRLAgent requires RLMonsterAgent component");
             }
 
             environment = FindFirstObjectByType<RLEnvironment>();
@@ -261,21 +261,21 @@ namespace Vampire.RL
 
         public override void CollectObservations(VectorSensor sensor)
         {
-            if (environment == null || rlMonster == null)
+            if (rlMonsterAgent == null)
                 return;
 
-            // Get state from RLEnvironment
-            var state = environment.GetState(rlMonster);
-
-            // Add observations to ML-Agents sensor
-            // State observations would be added here
+            // RLMonsterAgent handles CollectObservations via its own implementation
+            // This class acts as a wrapper for legacy ML-Agents integration
+            // Observations are collected directly by RLMonsterAgent.CollectObservations()
         }
 
         public override void OnActionReceived(ActionBuffers actions)
         {
-            if (rlMonster == null)
+            if (rlMonsterAgent == null)
                 return;
 
+            // RLMonsterAgent handles actions via its own implementation
+            // This class acts as a wrapper for legacy ML-Agents integration
             // Get action from ML-Agents
             int actionIndex = actions.DiscreteActions[0];
 
@@ -293,7 +293,7 @@ namespace Vampire.RL
         public override void OnEpisodeBegin()
         {
             // Reset agent state for new episode
-            if (rlMonster != null)
+            if (rlMonsterAgent != null)
             {
                 // Reset position, health, etc.
             }
