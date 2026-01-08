@@ -201,6 +201,7 @@ GameObject:
   - component: {fileID: 2512452010502925311}
   - component: {fileID: 3044377287714676616}
   - component: {fileID: 360842612624466292}
+  - component: {fileID: 1951622426998916064}
   m_Layer: 7
   m_Name: Default Melee Monster
   m_TagString: Untagged
@@ -371,6 +372,54 @@ MonoBehaviour:
   debugLogActionHistogram: 1
   histogramEveryNDecisions: 100
   histogramEverySeconds: 10
+--- !u!114 &1951622426998916064
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8960830493049914446}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3ce4661c5f228a439f218300df8b8bb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  decisionIndicatorSize: 0.5
+  decisionIndicatorDuration: 0.15
+  healthBarHeight: 0.15
+  healthBarOffset: 1.2
+  rlActiveColor: {r: 0.3, g: 0.5, b: 1, a: 0.8}
+  actionAggressive: {r: 1, g: 0, b: 0, a: 1}
+  actionMaintainDistance: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  actionRetreat: {r: 1, g: 0, b: 1, a: 1}
+  actionFlank: {r: 0, g: 1, b: 1, a: 1}
+  actionWait: {r: 0, g: 1, b: 0, a: 1}
+  showActionLabel: 1
+  showHealthBar: 1
+  showConfidence: 0
+  showTacticalInfo: 0
+  labelFont: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  canvasSortingLayerName: UI
+  canvasSortingOrder: 5000
+  canvasScale: 0.35
+  actionLabelFontSize: 0.1
+  actionLabelOffsetY: 1.5
+  healthBarWidth: 0.8
+  labelWidth: 1.2
+  labelHeight: 0.28
+  useConstantPixelSize: 1
+  referencePixelsPerUnit: 300
+  faceCamera: 0
+  addLabelOutline: 1
+  labelOutlineColor: {r: 0, g: 0, b: 0, a: 0.8}
+  labelOutlineWidth: 0.15
+  useUILayerForUI: 1
+  uiLayerName: UI
+  showLabelBackground: 1
+  debugForceLargeLabel: 0
+  debugAlwaysShowLabel: 1
+  debugFreezeLabelFade: 1
+  debugLabelText: TEST
 --- !u!1001 &1613326256856120527
 PrefabInstance:
   m_ObjectHideFlags: 0
