@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Vampire.Utilities;
+using System.Collections.Generic;
 
 namespace Vampire
 {
@@ -28,7 +29,11 @@ namespace Vampire
         [SerializeField] private bool enableDebugLogging = false;
 
         [Header("Difficulty Tuning")]
-        [SerializeField, Range(1f, 10f)] private float globalMonsterHpScale = 3f;
+        [SerializeField, Range(1f, 10f)] private float globalMonsterHpScale = 1f;
+        [SerializeField] private int maxLivingMonsters = 150;
+        [SerializeField] private float monsterDespawnDistance = 30f;
+        private float timeSinceLastDespawnCheck = 0f;
+        private const float despawnCheckInterval = 2f;
 
         public float GetGlobalMonsterHpScale() => globalMonsterHpScale;
 
@@ -171,13 +176,18 @@ namespace Vampire
                 float monsterSpawnDelay = spawnRate > 0 ? 1.0f / spawnRate : float.PositiveInfinity;
                 if (timeSinceLastMonsterSpawned >= monsterSpawnDelay)
                 {
-                    (int monsterIndex, float hpMultiplier) = levelBlueprint.monsterSpawnTable.SelectMonsterWithHPMultiplier(levelTime / levelBlueprint.levelTime);
-                    (int poolIndex, int blueprintIndex) = levelBlueprint.MonsterIndexMap[monsterIndex];
-                    MonsterBlueprint monsterBlueprint = levelBlueprint.monsters[poolIndex].monsterBlueprints[blueprintIndex];
-                    float baseHp = monsterBlueprint.hp;
-                    float hpBuff = baseHp * (globalMonsterHpScale * (1f + hpMultiplier) - 1f);
-                    Debug.Log($"[LevelManager] Spawning monster: baseHp={baseHp:F1}, globalScale={globalMonsterHpScale:F1}x, hpMultiplier={hpMultiplier:F2}, hpBuff={hpBuff:F1}");
-                    entityManager.SpawnMonsterRandomPosition(poolIndex, monsterBlueprint, hpBuff);
+                    // Check if we've reached the monster limit
+                    if (entityManager.LivingMonsters.Count < maxLivingMonsters)
+                    {
+                        (int monsterIndex, float hpMultiplier) = levelBlueprint.monsterSpawnTable.SelectMonsterWithHPMultiplier(levelTime / levelBlueprint.levelTime);
+                        (int poolIndex, int blueprintIndex) = levelBlueprint.MonsterIndexMap[monsterIndex];
+                        MonsterBlueprint monsterBlueprint = levelBlueprint.monsters[poolIndex].monsterBlueprints[blueprintIndex];
+                        float baseHp = monsterBlueprint.hp;
+                        float hpBuff = baseHp * (globalMonsterHpScale * (1f + hpMultiplier) - 1f);
+                        if (enableDebugLogging)
+                            Debug.Log($"[LevelManager] Spawning monster: baseHp={baseHp:F1}, globalScale={globalMonsterHpScale:F1}x, hpMultiplier={hpMultiplier:F2}, hpBuff={hpBuff:F1}");
+                        entityManager.SpawnMonsterRandomPosition(poolIndex, monsterBlueprint, hpBuff);
+                    }
                     timeSinceLastMonsterSpawned = Mathf.Repeat(timeSinceLastMonsterSpawned, monsterSpawnDelay);
                 }
             }
@@ -205,6 +215,49 @@ namespace Vampire
                 }
                 timeSinceLastChestSpawned = Mathf.Repeat(timeSinceLastChestSpawned, levelBlueprint.chestSpawnDelay);
             }
+
+            // Despawn distant monsters periodically to reduce lag
+            timeSinceLastDespawnCheck += Time.deltaTime;
+            if (timeSinceLastDespawnCheck >= despawnCheckInterval)
+            {
+                DespawnDistantMonsters();
+                timeSinceLastDespawnCheck = 0f;
+            }
+        }
+
+        private void DespawnDistantMonsters()
+        {
+            if (entityManager.LivingMonsters == null) return;
+
+            Vector2 playerPos = playerCharacter.transform.position;
+            int despawnedCount = 0;
+
+            // Collect monsters to despawn first to avoid modifying collection during iteration
+            List<Monster> toDespawn = new List<Monster>();
+
+            foreach (Monster monster in entityManager.LivingMonsters)
+            {
+                if (monster == null) continue;
+
+                // Don't despawn bosses
+                if (monster as BossMonster) continue;
+
+                float distance = Vector2.Distance(playerPos, monster.transform.position);
+                if (distance > monsterDespawnDistance)
+                {
+                    toDespawn.Add(monster);
+                }
+            }
+
+            // Now despawn them
+            foreach (Monster monster in toDespawn)
+            {
+                entityManager.DespawnMonster(monster, false);
+                despawnedCount++;
+            }
+
+            if (enableDebugLogging && despawnedCount > 0)
+                Debug.Log($"[LevelManager] Despawned {despawnedCount} distant monsters");
         }
 
         public void GameOver()

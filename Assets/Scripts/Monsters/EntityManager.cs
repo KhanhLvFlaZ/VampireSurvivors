@@ -15,7 +15,7 @@ namespace Vampire
         [SerializeField] private float monsterSpawnBufferDistance;  // Extra distance outside of the screen view at which monsters should be spawned
         [SerializeField] private float playerDirectionSpawnWeight;  // How much do we weight the player's movement direction in the spawning of monsters
         [Header("Chest Spawning Settings")]
-        [SerializeField] private  float chestSpawnRange = 5;
+        [SerializeField] private float chestSpawnRange = 5;
         [Header("Object Pool Settings")]
         [SerializeField] private GameObject monsterPoolParent;
         private MonsterPool[] monsterPools;
@@ -48,7 +48,7 @@ namespace Vampire
         private InfiniteBackground infiniteBackground;
         private FastList<Monster> livingMonsters;
         private FastList<Collectable> magneticCollectables;
-        public FastList<Chest> chests; 
+        public FastList<Chest> chests;
         private float timeSinceLastMonsterSpawned;
         private float timeSinceLastChestSpawned;
         private float screenWidthWorldSpace, screenHeightWorldSpace, screenDiagonalWorldSpace;
@@ -76,13 +76,13 @@ namespace Vampire
             screenWidthWorldSpace = topRight.x - bottomLeft.x;
             screenHeightWorldSpace = topRight.y - bottomLeft.y;
             screenDiagonalWorldSpace = (topRight - bottomLeft).magnitude;
-            minSpawnDistance = screenDiagonalWorldSpace/2;
+            minSpawnDistance = screenDiagonalWorldSpace / 2;
 
             // Init fast lists
             livingMonsters = new FastList<Monster>();
             magneticCollectables = new FastList<Collectable>();
             chests = new FastList<Chest>();
-            
+
             // Initialize a monster pool for each monster prefab
             monsterPools = new MonsterPool[levelBlueprint.monsters.Length + 1];
             for (int i = 0; i < levelBlueprint.monsters.Length; i++)
@@ -90,8 +90,8 @@ namespace Vampire
                 monsterPools[i] = monsterPoolParent.AddComponent<MonsterPool>();
                 monsterPools[i].Init(this, playerCharacter, levelBlueprint.monsters[i].monstersPrefab);
             }
-            monsterPools[monsterPools.Length-1] = monsterPoolParent.AddComponent<MonsterPool>();
-            monsterPools[monsterPools.Length-1].Init(this, playerCharacter, levelBlueprint.finalBoss.bossPrefab);
+            monsterPools[monsterPools.Length - 1] = monsterPoolParent.AddComponent<MonsterPool>();
+            monsterPools[monsterPools.Length - 1].Init(this, playerCharacter, levelBlueprint.finalBoss.bossPrefab);
             // Initialize a projectile pool for each ranged projectile type
             projectileIndexByPrefab = new Dictionary<GameObject, int>();
             projectilePools = new List<ProjectilePool>();
@@ -108,7 +108,7 @@ namespace Vampire
             textPool.Init(this, playerCharacter, textPrefab);
 
             // Init spatial hash grid
-            Vector2[] bounds = new Vector2[] { (Vector2)playerCharacter.transform.position - gridSize/2, (Vector2)playerCharacter.transform.position + gridSize/2 };
+            Vector2[] bounds = new Vector2[] { (Vector2)playerCharacter.transform.position - gridSize / 2, (Vector2)playerCharacter.transform.position + gridSize / 2 };
             grid = new SpatialHashGrid(bounds, gridDimensions);
         }
 
@@ -127,7 +127,7 @@ namespace Vampire
         public void CollectAllCoinsAndGems()
         {
             if (shockwave != null) StopCoroutine(shockwave);
-            shockwave = StartCoroutine(infiniteBackground.Shockwave(screenDiagonalWorldSpace/2));
+            shockwave = StartCoroutine(infiniteBackground.Shockwave(screenDiagonalWorldSpace / 2));
             foreach (Collectable collectable in magneticCollectables.ToList())
             {
                 collectable.Collect();
@@ -138,7 +138,7 @@ namespace Vampire
         {
             if (flashCoroutine != null) StopCoroutine(flashCoroutine);
             flashCoroutine = StartCoroutine(Flash());
-            foreach (Monster monster in livingMonsters.ToList() )
+            foreach (Monster monster in livingMonsters.ToList())
             {
                 if (TransformOnScreen(monster.transform, Vector2.one))
                     monster.TakeDamage(damage, Vector2.zero);
@@ -147,7 +147,7 @@ namespace Vampire
 
         public void KillAllMonsters()
         {
-            foreach (Monster monster in livingMonsters.ToList() )
+            foreach (Monster monster in livingMonsters.ToList())
             {
                 if (!(monster as BossMonster))
                     StartCoroutine(monster.Killed(false));
@@ -160,7 +160,7 @@ namespace Vampire
             float t = 0;
             while (t < 1)
             {
-                flashSpriteRenderer.color = new Color(1, 1, 1, 1-EasingUtils.EaseOutQuart(t));
+                flashSpriteRenderer.color = new Color(1, 1, 1, 1 - EasingUtils.EaseOutQuart(t));
                 t += Time.unscaledDeltaTime * 4;
                 yield return null;
             }
@@ -170,10 +170,10 @@ namespace Vampire
         public bool TransformOnScreen(Transform transform, Vector2 buffer = default(Vector2))
         {
             return (
-                transform.position.x > playerCharacter.transform.position.x - screenWidthWorldSpace/2 - buffer.x &&
-                transform.position.x < playerCharacter.transform.position.x + screenWidthWorldSpace/2 + buffer.x &&
-                transform.position.y > playerCharacter.transform.position.y - screenHeightWorldSpace/2 - buffer.y &&
-                transform.position.y < playerCharacter.transform.position.y + screenHeightWorldSpace/2 + buffer.y
+                transform.position.x > playerCharacter.transform.position.x - screenWidthWorldSpace / 2 - buffer.x &&
+                transform.position.x < playerCharacter.transform.position.x + screenWidthWorldSpace / 2 + buffer.x &&
+                transform.position.y > playerCharacter.transform.position.y - screenHeightWorldSpace / 2 - buffer.y &&
+                transform.position.y < playerCharacter.transform.position.y + screenHeightWorldSpace / 2 + buffer.y
             );
         }
 
@@ -210,18 +210,26 @@ namespace Vampire
             monsterPools[monsterPoolIndex].Release(monster);
         }
 
+        public void DespawnMonster(Monster monster, bool killedByPlayer = false)
+        {
+            // Get monster pool index from the monster's Setup data
+            int poolIndex = monster.GetType().GetField("monsterIndex", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?.GetValue(monster) as int? ?? 0;
+            DespawnMonster(poolIndex, monster, killedByPlayer);
+        }
+
         private Vector2 GetRandomMonsterSpawnPosition()
         {
             Vector2[] sideDirections = new Vector2[] { Vector2.left, Vector2.up, Vector2.right, Vector2.down };
-            int sideIndex = Random.Range(0,4);
+            int sideIndex = Random.Range(0, 4);
             Vector2 spawnPosition;
             if (sideIndex % 2 == 0)
             {
-                spawnPosition = (Vector2)playerCharacter.transform.position + sideDirections[sideIndex] * (screenWidthWorldSpace/2+monsterSpawnBufferDistance) + Vector2.up * Random.Range(-screenHeightWorldSpace/2-monsterSpawnBufferDistance, screenHeightWorldSpace/2+monsterSpawnBufferDistance);
+                spawnPosition = (Vector2)playerCharacter.transform.position + sideDirections[sideIndex] * (screenWidthWorldSpace / 2 + monsterSpawnBufferDistance) + Vector2.up * Random.Range(-screenHeightWorldSpace / 2 - monsterSpawnBufferDistance, screenHeightWorldSpace / 2 + monsterSpawnBufferDistance);
             }
             else
             {
-                spawnPosition = (Vector2)playerCharacter.transform.position + sideDirections[sideIndex] * (screenHeightWorldSpace/2+monsterSpawnBufferDistance) + Vector2.right * Random.Range(-screenWidthWorldSpace/2-monsterSpawnBufferDistance, screenWidthWorldSpace/2+monsterSpawnBufferDistance);
+                spawnPosition = (Vector2)playerCharacter.transform.position + sideDirections[sideIndex] * (screenHeightWorldSpace / 2 + monsterSpawnBufferDistance) + Vector2.right * Random.Range(-screenWidthWorldSpace / 2 - monsterSpawnBufferDistance, screenWidthWorldSpace / 2 + monsterSpawnBufferDistance);
             }
             return spawnPosition;
         }
@@ -237,12 +245,12 @@ namespace Vampire
                 Vector2.Dot(playerCharacter.Velocity.normalized, sideDirections[2]),
                 Vector2.Dot(playerCharacter.Velocity.normalized, sideDirections[3])
             };
-            float extraWeight = sideWeights.Sum()/playerDirectionSpawnWeight;
+            float extraWeight = sideWeights.Sum() / playerDirectionSpawnWeight;
             int badSideCount = sideWeights.Where(x => x <= 0).Count();
             for (int i = 0; i < sideWeights.Length; i++)
             {
                 if (sideWeights[i] <= 0)
-                    sideWeights[i] = extraWeight / badSideCount; 
+                    sideWeights[i] = extraWeight / badSideCount;
             }
             float totalSideWeight = sideWeights.Sum();
 
@@ -262,11 +270,11 @@ namespace Vampire
             Vector2 spawnPosition;
             if (sideIndex % 2 == 0)
             {
-                spawnPosition = (Vector2)playerCharacter.transform.position + sideDirections[sideIndex] * (screenWidthWorldSpace/2+monsterSpawnBufferDistance) + Vector2.up * Random.Range(-screenHeightWorldSpace/2-monsterSpawnBufferDistance, screenHeightWorldSpace/2+monsterSpawnBufferDistance);
+                spawnPosition = (Vector2)playerCharacter.transform.position + sideDirections[sideIndex] * (screenWidthWorldSpace / 2 + monsterSpawnBufferDistance) + Vector2.up * Random.Range(-screenHeightWorldSpace / 2 - monsterSpawnBufferDistance, screenHeightWorldSpace / 2 + monsterSpawnBufferDistance);
             }
             else
             {
-                spawnPosition = (Vector2)playerCharacter.transform.position + sideDirections[sideIndex] * (screenHeightWorldSpace/2+monsterSpawnBufferDistance) + Vector2.right * Random.Range(-screenWidthWorldSpace/2-monsterSpawnBufferDistance, screenWidthWorldSpace/2+monsterSpawnBufferDistance);
+                spawnPosition = (Vector2)playerCharacter.transform.position + sideDirections[sideIndex] * (screenHeightWorldSpace / 2 + monsterSpawnBufferDistance) + Vector2.right * Random.Range(-screenWidthWorldSpace / 2 - monsterSpawnBufferDistance, screenWidthWorldSpace / 2 + monsterSpawnBufferDistance);
             }
             return spawnPosition;
         }
@@ -383,7 +391,7 @@ namespace Vampire
             projectile.Setup(projectileIndex, position, damage, knockback, speed, targetLayer);
             return projectile;
         }
-        
+
         public void DespawnProjectile(int projectileIndex, Projectile projectile)
         {
             projectilePools[projectileIndex].Release(projectile);

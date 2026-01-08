@@ -30434,7 +30434,8 @@ MonoBehaviour:
   statsManager: {fileID: 1845134363}
   gameOverDialog: {fileID: 1042722128}
   gameTimer: {fileID: 2096653587}
-  globalMonsterHpScale: 3
+  enableDebugLogging: 0
+  globalMonsterHpScale: 1
 --- !u!114 &1764401685
 MonoBehaviour:
   m_ObjectHideFlags: 0
