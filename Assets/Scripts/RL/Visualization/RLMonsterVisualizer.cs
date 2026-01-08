@@ -25,7 +25,6 @@ namespace Vampire.RL.Visualization
         [SerializeField] private float healthBarOffset = 1.2f;
 
         [Header("Colors")]
-        [SerializeField] private Color rlActiveColor = new Color(0.3f, 0.5f, 1f, 0.8f); // Blue tint
         [SerializeField] private Color actionAggressive = Color.red;
         [SerializeField] private Color actionMaintainDistance = Color.yellow;
         [SerializeField] private Color actionRetreat = Color.magenta;
@@ -130,7 +129,6 @@ namespace Vampire.RL.Visualization
             if (visualizerContainer != null && !visualizerContainer.activeInHierarchy)
             {
                 visualizerContainer.SetActive(true);
-                ApplyRLTint();
                 EnsureUIElements();
                 if (!uiActivationLogged)
                 {
@@ -369,17 +367,6 @@ namespace Vampire.RL.Visualization
         }
 
         /// <summary>
-        /// Apply RL visual tint to monster sprite
-        /// </summary>
-        private void ApplyRLTint()
-        {
-            if (spriteRenderer)
-            {
-                spriteRenderer.color = rlActiveColor;
-            }
-        }
-
-        /// <summary>
         /// Update all visual indicators
         /// </summary>
         private void UpdateVisuals()
@@ -401,14 +388,11 @@ namespace Vampire.RL.Visualization
             // Update health bar
             if (showHealthBar && baseMonster)
             {
-                // Simple health ratio using HP property (0-1)
                 float currentHp = baseMonster.HP;
-                float maxHp = 50f; // Default fallback
+                float maxHp = baseMonster.MaxHP > 0 ? baseMonster.MaxHP : currentHp;
+                if (maxHp <= 0) maxHp = 1f; // avoid division by zero
 
-                // Try to get actual max HP from current setup
-                if (currentHp <= 0) maxHp = 1f; // Avoid division by zero
-
-                float healthRatio = Mathf.Clamp01(currentHp / Mathf.Max(1f, maxHp));
+                float healthRatio = Mathf.Clamp01(currentHp / maxHp);
                 if (healthBarRect)
                 {
                     healthBarRect.localScale = new Vector3(healthRatio, 1f, 1f);

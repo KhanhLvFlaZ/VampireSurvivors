@@ -20,6 +20,7 @@ namespace Vampire
         protected SpriteRenderer monsterSpriteRenderer;
         protected ZPositioner zPositioner;
         protected float currentHealth;  // 血量
+        protected float maxHealth;
         protected EntityManager entityManager;  // 怪物池
         protected Character playerCharacter;  // 角色
         protected Rigidbody2D rb;
@@ -32,6 +33,7 @@ namespace Vampire
         public UnityEvent<Monster> OnKilled { get; } = new UnityEvent<Monster>();
         public UnityEvent<float> OnDamaged { get; } = new UnityEvent<float>();
         public float HP => currentHealth;
+        public float MaxHP => maxHealth;
         public bool ExternalControlEnabled { get; set; } = false;
         // Spatial Hash Grid Client Interface
         public Vector2 Position => transform.position;
@@ -64,7 +66,8 @@ namespace Vampire
             rb.position = position;
             transform.position = position;
             // Reset health to max
-            currentHealth = monsterBlueprint.hp + hpBuff;
+            maxHealth = monsterBlueprint.hp + hpBuff;
+            currentHealth = maxHealth;
             // Toggle alive flag on
             alive = true;
             // Add to list of living monsters
