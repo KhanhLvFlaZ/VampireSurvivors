@@ -1,0 +1,129 @@
+@startuml UC5_Training_RL_Model_Decomposition
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam actorStyle awesome
+left to right direction
+
+' ====== ACTORS ======
+actor "Developer" as Developer #LightBlue
+actor "ML-Agents" as MLAgents #Orange
+actor "Unity" as UnityEngine #LightGreen
+
+' ====== MAIN SYSTEM BOUNDARY ======
+rectangle "UC5: Huấn Luyện Mô Hình RL" {
+
+  usecase "UC5.1: Khởi động\nTraining" as UC5_1 #LightYellow
+  usecase "UC5.2: Kết nối\nUnity" as UC5_2 #LightYellow
+  usecase "UC5.3: Episode\nLoop" as UC5_3 #LightSalmon
+  usecase "UC5.4: Tối ưu\nPolicy (PPO)" as UC5_4 #LightSalmon
+  usecase "UC5.5: Lưu & Export\nModel" as UC5_5 #LightGray
+  usecase "UC5.6: Exception\nHandling" as UC5_6 #Salmon
+
+  ' ===== Sub-flows của UC5.3 =====
+  rectangle "Episode Loop Detail" {
+    usecase "Reset Env" as UC5_3a #WhiteSmoke
+    usecase "Get Obs" as UC5_3b #WhiteSmoke
+    usecase "Compute Actions" as UC5_3c #WhiteSmoke
+    usecase "Apply & Reward" as UC5_3d #WhiteSmoke
+    usecase "Store Transition" as UC5_3e #WhiteSmoke
+  }
+}
+
+' ====== ACTOR ASSOCIATIONS ======
+Developer --> UC5_1 : "run"
+MLAgents --> UC5_2 : "connect"
+UnityEngine --> UC5_2 : "accept"
+UnityEngine --> UC5_3 : "simulate"
+MLAgents --> UC5_4 : "optimize"
+
+' ====== MAIN FLOW ======
+UC5_1 --> UC5_2 : <<precedes>>
+UC5_2 --> UC5_3 : <<precedes>>
+UC5_3 --> UC5_4 : <<triggers>>\n(every N eps)
+UC5_4 --> UC5_5 : <<precedes>>\n(every M steps)
+
+' ====== EPISODE LOOP DECOMPOSITION ======
+UC5_3 ..> UC5_3a : <<include>>
+UC5_3 ..> UC5_3b : <<include>>
+UC5_3 ..> UC5_3c : <<include>>
+UC5_3 ..> UC5_3d : <<include>>
+UC5_3 ..> UC5_3e : <<include>>
+
+' ====== EPISODE SEQUENCE ======
+UC5_3a --> UC5_3b : <<precedes>>
+UC5_3b --> UC5_3c : <<precedes>>
+UC5_3c --> UC5_3d : <<precedes>>
+UC5_3d --> UC5_3e : <<precedes>>
+
+' ====== EXCEPTION FLOWS ======
+UC5_2 ..> UC5_6 : <<exception>>
+UC5_3d ..> UC5_6 : <<exception>>
+UC5_4 ..> UC5_6 : <<exception>>
+
+' ====== NOTES ======
+note right of UC5_1
+  mlagents-learn 
+  config/ppo_vampire.yaml
+end note
+
+note right of UC5_2
+  Port 5004
+  Timeout: 30s
+  Retry: 3x
+end note
+
+note right of UC5_3a
+  Spawn agents
+  Clear entities
+end note
+
+note right of UC5_3b
+  Positions, health
+  Wave info, state
+end note
+
+note right of UC5_3c
+  Policy network
+  Forward pass
+end note
+
+note right of UC5_3d
+  Kill: +10, Die: -50
+  Survival: +1/frame
+end note
+
+note right of UC5_3e
+  Store (obs, action,
+  reward, next_obs)
+end note
+
+note right of UC5_4
+  PPO algorithm
+  Clip ratio: 0.2
+  Gradient descent
+end note
+
+note right of UC5_5
+  Save .pt checkpoint
+  Export ONNX model
+  results/run_001/
+end note
+
+note right of UC5_6
+  • Socket Timeout
+    → Retry 3x, resume
+  • NaN Reward
+    → Clip, continue
+  • Gradient Explosion
+    → Reduce LR, rollback
+end note
+
+legend right
+  |<#LightYellow> Initialization |
+  |<#LightSalmon> Core Loop |
+  |<#LightGray> Post-processing |
+  |<#Salmon> Error Handling |
+  |<#WhiteSmoke> Sub-flows |
+endlegend
+
+@enduml

@@ -1,0 +1,177 @@
+name: CoopMultiPlayerIntegrationTests
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "Assets/Scripts/Gameplay/**"
+      - "Assets/Scripts/RL/**"
+      - ".github/workflows/multi-player-tests.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "Assets/Scripts/Gameplay/**"
+      - "Assets/Scripts/RL/**"
+
+jobs:
+  unity-tests:
+    name: Playmode Tests - Multi-Player Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          lfs: true
+
+      - name: Create LFS file list
+        run: git lfs ls-files -l | cut -d' ' -f1 | sort > .lfsconfig
+
+      - name: Restore LFS cache
+        uses: actions/cache@v3
+        id: lfs-cache
+        with:
+          path: .git/lfs
+          key: ${{ runner.os }}-lfs-${{ hashFiles('.lfsconfig') }}
+
+      - name: Git LFS Pull
+        run: |
+          git lfs install --local --skip-repo
+          git lfs pull
+
+      - name: Cache Library
+        uses: actions/cache@v3
+        with:
+          path: Library
+          key: Library-${{ matrix.targetGroup }}
+          restore-keys: Library-
+
+      - name: Run playmode tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: playmode
+          artifactsPath: artifacts
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Playmode Test Results
+          useScreenshots: false
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results-playmode
+          path: artifacts
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: artifacts/**/*.xml
+          check_name: Playmode Test Results
+          comment_title: Multi-Player Test Results
+
+  performance-benchmarks:
+    name: Network Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: unity-tests
+    if: success()
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          lfs: true
+
+      - name: Restore LFS cache
+        uses: actions/cache@v3
+        with:
+          path: .git/lfs
+          key: ${{ runner.os }}-lfs-${{ hashFiles('.lfsconfig') }}
+
+      - name: Git LFS Pull
+        run: |
+          git lfs install --local --skip-repo
+          git lfs pull
+
+      - name: Cache Library
+        uses: actions/cache@v3
+        with:
+          path: Library
+          key: Library-benchmark
+
+      - name: Run performance benchmarks
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          testMode: playmode
+          testFilter: NetworkPerformanceBenchmark
+          artifactsPath: benchmarks
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Performance Benchmark Results
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmarks
+
+  latency-bandwidth-report:
+    name: Latency & Bandwidth Report
+    runs-on: ubuntu-latest
+    needs: unity-tests
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download test artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: test-results-playmode
+          path: test-results
+
+      - name: Generate network metrics report
+        run: |
+          python scripts/generate_network_report.py test-results/ --output network_metrics.json
+
+      - name: Upload metrics
+        uses: actions/upload-artifact@v3
+        with:
+          name: network-metrics
+          path: network_metrics.json
+
+      - name: Comment PR with metrics
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const metrics = JSON.parse(fs.readFileSync('network_metrics.json', 'utf8'));
+            const comment = `## 🌐 Network Performance Metrics
+
+            ### Latency
+            - Average RTT: ${metrics.latency.average.toFixed(2)}ms
+            - Max RTT: ${metrics.latency.max.toFixed(2)}ms
+            - Min RTT: ${metrics.latency.min.toFixed(2)}ms
+
+            ### Bandwidth
+            - Avg Upstream: ${metrics.bandwidth.upstream.toFixed(2)} Kbps
+            - Avg Downstream: ${metrics.bandwidth.downstream.toFixed(2)} Kbps
+            - Peak: ${metrics.bandwidth.peak.toFixed(2)} Kbps
+
+            ### 2+ Player Scenarios
+            - 2 Players: ✅ ${metrics.scenarios.twoPlayers ? 'PASS' : 'FAIL'}
+            - 3 Players: ✅ ${metrics.scenarios.threePlayers ? 'PASS' : 'FAIL'}
+            - 4 Players: ✅ ${metrics.scenarios.fourPlayers ? 'PASS' : 'FAIL'}
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

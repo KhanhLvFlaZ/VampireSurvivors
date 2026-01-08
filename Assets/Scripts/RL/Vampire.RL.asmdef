@@ -1,0 +1,21 @@
+{
+  "name": "Vampire.RL",
+  "rootNamespace": "Vampire.RL",
+  "references": [
+    "Vampire",
+    "Unity.TextMeshPro",
+    "Unity.ML-Agents",
+    "Unity.ML-Agents.Extensions",
+    "Assembly-CSharp",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
