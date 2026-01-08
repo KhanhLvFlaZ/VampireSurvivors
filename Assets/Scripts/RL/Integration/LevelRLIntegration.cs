@@ -38,6 +38,7 @@ namespace Vampire.RL.Integration
         private EvaluationScenarioManager evaluationManager;
         private bool isInitialized = false;
         private float timeSinceLastUpdate = 0f;
+        private bool rlInitializationScheduled = false;
 
         // Events
         public event Action OnRLInitialized;
@@ -57,10 +58,134 @@ namespace Vampire.RL.Integration
 
         private void Start()
         {
-            if (enableRLForLevel)
+            if (enableRLForLevel && !rlInitializationScheduled)
             {
-                InitializeRL();
+                rlInitializationScheduled = true;
+                // Defer RL initialization by 3 frames to prevent startup freeze
+                StartCoroutine(DeferredRLInitialization());
             }
+        }
+
+        /// <summary>
+        /// Defers RL system initialization to avoid blocking the main thread on level load
+        /// Spreads initialization across multiple frames to prevent any freeze
+        /// </summary>
+        private System.Collections.IEnumerator DeferredRLInitialization()
+        {
+            // Phase 1: Wait for level to stabilize (5 frames)
+            for (int i = 0; i < 5; i++)
+            {
+                yield return null;
+            }
+
+            // Phase 2: Create base components gradually
+            if (!isInitialized && enableRLForLevel)
+            {
+                // Create RL System (spread over 3 frames)
+                var rlSystemGO = new GameObject("RLSystem_Level");
+                rlSystemGO.transform.SetParent(transform);
+                yield return null;
+
+                rlSystem = rlSystemGO.AddComponent<RLSystem>();
+                yield return null;
+
+                // Initialize in background
+                StartCoroutine(InitializeRLGradually());
+            }
+        }
+
+        /// <summary>
+        /// Initialize RL system components gradually across frames
+        /// </summary>
+        private System.Collections.IEnumerator InitializeRLGradually()
+        {
+            // Step 1: Player and profile setup
+            if (rlSystem != null && playerCharacter != null)
+            {
+                rlSystem.Initialize(playerCharacter, playerProfileId);
+            }
+            yield return null;
+
+            // Step 2: Behavior profile manager
+            try
+            {
+                behaviorProfileManager = new BehaviorProfileManager();
+                behaviorProfileManager.Initialize(playerProfileId);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to initialize behavior profile manager: {ex.Message}");
+            }
+            yield return null;
+
+            // Step 3: Initialize monster list
+            activRLMonsters = new List<RLMonsterAgent>();
+            yield return null;
+
+            // Step 4: Performance monitor
+            performanceMonitor = GetComponent<PerformanceMonitor>();
+            if (performanceMonitor == null)
+            {
+                var pmGO = new GameObject("PerformanceMonitor");
+                pmGO.transform.SetParent(transform);
+                performanceMonitor = pmGO.AddComponent<PerformanceMonitor>();
+            }
+            yield return null;
+
+            // Step 5: Metrics recorder
+            metricsRecorder = GetComponent<EpisodeMetricsRecorder>();
+            if (metricsRecorder == null)
+            {
+                var metricsGO = new GameObject("EpisodeMetricsRecorder");
+                metricsGO.transform.SetParent(transform);
+                metricsRecorder = metricsGO.AddComponent<EpisodeMetricsRecorder>();
+            }
+            yield return null;
+
+            // Step 5b: Initialize metrics
+            try
+            {
+                if (metricsRecorder != null && performanceMonitor != null)
+                {
+                    metricsRecorder.Initialize(performanceMonitor);
+                    metricsRecorder.StartRun(UnityEngine.Random.Range(int.MinValue, int.MaxValue), levelTrainingMode.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to initialize metrics recorder: {ex.Message}");
+            }
+            yield return null;
+
+            // Step 6: Evaluation scenario manager
+            evaluationManager = GetComponent<EvaluationScenarioManager>();
+            if (evaluationManager == null)
+            {
+                var evalGO = new GameObject("EvaluationScenarioManager");
+                evalGO.transform.SetParent(transform);
+                evaluationManager = evalGO.AddComponent<EvaluationScenarioManager>();
+            }
+            yield return null;
+
+            // Step 6b: Initialize evaluation manager
+            try
+            {
+                if (evaluationManager != null && metricsRecorder != null)
+                {
+                    evaluationManager.Initialize(this, metricsRecorder);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to initialize evaluation manager: {ex.Message}");
+            }
+            yield return null;
+
+            // Finalize
+            isInitialized = true;
+            OnRLInitialized?.Invoke();
+
+            Debug.Log($"[RL Integration] RL System initialized gradually over {Time.frameCount} frames with training mode: {levelTrainingMode}");
         }
 
         private void Update()

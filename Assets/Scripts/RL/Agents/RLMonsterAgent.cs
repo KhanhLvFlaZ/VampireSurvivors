@@ -36,6 +36,12 @@ namespace Vampire.RL
         private float damageReceivedRecently = 0f;
         private float damageTrackingWindow = 5f; // Track damage in last 5s
 
+        [Header("Action Masking")]
+        [SerializeField] private bool enableActionMasking = true;
+        [SerializeField, Range(0.05f, 0.6f)] private float lowHpMaskThreshold = 0.3f;
+        [SerializeField] private float dangerDistanceForAggressive = 6f;
+        [SerializeField] private float farDistanceDisableWait = 9f;
+
         [Header("Allies Tracking")]
         private List<RLMonsterAgent> nearbyAllies = new List<RLMonsterAgent>();
         public float allyCheckRadius = 10f;
@@ -51,10 +57,22 @@ namespace Vampire.RL
 
         [Header("Debug")]
         [SerializeField] private bool showDebugGizmos = false;
+        [SerializeField] private bool debugLogInference = false;
+        [SerializeField] private int logEveryNDecisions = 60; // spam guard
+        [SerializeField] private bool debugLogActionHistogram = false;
+        [SerializeField] private int histogramEveryNDecisions = 100;
+        [SerializeField] private float histogramEverySeconds = 10f;
+
+        private int _decisionCounter = 0;
+        private bool _loggedInferenceStart = false;
+        private int[] _actionCounts = new int[5];
+        private float _lastHistogramTime = 0f;
 
         // Inference control state
         private bool isControlling = false;
         public bool IsControlling => isControlling;
+        private int currentAction = -1;
+        public int CurrentAction => currentAction;
         private float decisionInterval = 0.1f; // seconds
         private float nextDecisionTime = 0f;
 
@@ -78,7 +96,31 @@ namespace Vampire.RL
                 LinkWithMonster(baseMonster);
             }
 
-            Debug.Log($"[RLMonsterAgent] Initialized with maxHP={maxHP}, moveSpeed={moveSpeed}");
+            // Validate BehaviorParameters & model bindings at runtime for quick diagnosis
+            var bp = GetComponent<BehaviorParameters>();
+            if (bp == null)
+            {
+                Debug.LogWarning("[RLMonsterAgent] Missing BehaviorParameters component. Inference cannot run.");
+            }
+            else
+            {
+                var aspec = bp.BrainParameters.ActionSpec;
+                if (aspec.NumDiscreteActions != 1 || aspec.BranchSizes.Length != 1 || aspec.BranchSizes[0] != 5)
+                {
+                    Debug.LogWarning($"[RLMonsterAgent] Action space mismatch. Expected 1 discrete branch of size 5, got branches={aspec.NumDiscreteActions}, sizes=[{string.Join(",", aspec.BranchSizes)}].");
+                }
+
+                if (debugLogInference)
+                {
+                    string modelName = bp.Model != null ? bp.Model.name : "<none>";
+                    Debug.Log($"[RLMonsterAgent] BehaviorType={bp.BehaviorType}, Model={modelName}");
+                }
+            }
+
+            if (debugLogInference)
+            {
+                Debug.Log($"[RLMonsterAgent] Initialized with maxHP={maxHP}, moveSpeed={moveSpeed}");
+            }
         }
 
         /// <summary>
@@ -97,6 +139,7 @@ namespace Vampire.RL
             // Ensure rigidbody is properly configured
             if (rb != null)
             {
+                _lastHistogramTime = Time.time;
                 rb.linearVelocity = Vector2.zero;
                 rb.angularVelocity = 0f;
                 rb.bodyType = RigidbodyType2D.Dynamic;
@@ -116,12 +159,19 @@ namespace Vampire.RL
             if (playerCharacter == null)
             {
                 playerTransform = FindPlayerTransformFallback();
+                if (playerTransform == null)
+                {
+                    Debug.LogWarning("[RLMonsterAgent] No player found. Observations will be zeros; policy behavior may look inert.");
+                }
             }
 
             // Update nearby allies
             UpdateNearbyAllies();
 
-            Debug.Log($"[RLMonsterAgent] Episode started at position {transform.position}");
+            if (debugLogInference)
+            {
+                Debug.Log($"[RLMonsterAgent] Episode started at position {transform.position}");
+            }
         }
 
         /// <summary>
@@ -186,6 +236,9 @@ namespace Vampire.RL
             if (baseMonster != null) baseMonster.ExternalControlEnabled = true;
 
             int tacticalAction = actions.DiscreteActions[0]; // 0-4: tactical decisions
+            currentAction = tacticalAction; // Store for visualization
+            if (tacticalAction >= 0 && tacticalAction < _actionCounts.Length)
+                _actionCounts[tacticalAction]++;
 
             Vector2 dirToPlayer = (playerPos - transform.position).normalized;
             float distanceToPlayer = Vector2.Distance(transform.position, playerPos);
@@ -231,6 +284,35 @@ namespace Vampire.RL
             Vector2 desiredVelocity = moveDirection * moveSpeed * speedMultiplier;
             float blend = 0.3f; // smoothing factor (0..1)
             rb.linearVelocity = Vector2.Lerp(rb.linearVelocity, desiredVelocity, blend);
+
+            // Debug trace to confirm inference activity and decisions
+            _decisionCounter++;
+            if (debugLogInference)
+            {
+                if (!_loggedInferenceStart)
+                {
+                    Debug.Log($"[RLMonsterAgent] Inference active. First action received. action={tacticalAction}, distance={distanceToPlayer:F2}");
+                    _loggedInferenceStart = true;
+                }
+                else if (_decisionCounter % Mathf.Max(1, logEveryNDecisions) == 0)
+                {
+                    var v = rb.linearVelocity;
+                    Debug.Log($"[RLMonsterAgent] action={tacticalAction}, vel=({v.x:F2},{v.y:F2}), dist={distanceToPlayer:F2}, controlling={isControlling}");
+                }
+            }
+
+            if (debugLogActionHistogram)
+            {
+                bool hitCountGate = (_decisionCounter % Mathf.Max(1, histogramEveryNDecisions) == 0);
+                bool hitTimeGate = (Time.time - _lastHistogramTime) >= Mathf.Max(1f, histogramEverySeconds);
+                if (hitCountGate || hitTimeGate)
+                {
+                    int total = Mathf.Max(1, _actionCounts[0] + _actionCounts[1] + _actionCounts[2] + _actionCounts[3] + _actionCounts[4]);
+                    string hist = $"A0={(100f * _actionCounts[0] / total):F0}% A1={(100f * _actionCounts[1] / total):F0}% A2={(100f * _actionCounts[2] / total):F0}% A3={(100f * _actionCounts[3] / total):F0}% A4={(100f * _actionCounts[4] / total):F0}% (n={total})";
+                    Debug.Log($"[RLMonsterAgent] ActionHistogram {hist}");
+                    _lastHistogramTime = Time.time;
+                }
+            }
 
             // === CALCULATE REWARDS ===
             CalculateTacticalRewards(tacticalAction, distanceToPlayer);
@@ -573,7 +655,9 @@ namespace Vampire.RL
             foreach (var ally in nearbyAllies)
             {
                 if (ally != null)
+                {
                     Gizmos.DrawLine(transform.position, ally.transform.position);
+                }
             }
         }
 
@@ -585,18 +669,23 @@ namespace Vampire.RL
         {
             baseMonster = monster;
 
-            // Sync stats from monster blueprint
             if (monster != null)
             {
                 maxHP = monster.HP;
                 currentHP = maxHP;
                 // moveSpeed would come from monster.monsterBlueprint.movespeed
-                // Subscribe to damage events to keep RL HP in sync (for game integration)
                 monster.OnDamaged.RemoveListener(OnTakeDamage);
                 monster.OnDamaged.AddListener(OnTakeDamage);
-            }
 
-            Debug.Log($"[RLMonsterAgent] Linked with Monster component");
+                if (debugLogInference)
+                {
+                    Debug.Log($"[RLMonsterAgent] Linked with Monster: name={monster.name}, Monster.HP={monster.HP:F1}, synced maxHP={maxHP:F1}");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[RLMonsterAgent] LinkWithMonster called with null Monster!");
+            }
         }
 
         /// <summary>
@@ -605,6 +694,40 @@ namespace Vampire.RL
         public void SetEntityManager(EntityManager manager)
         {
             entityManager = manager;
+        }
+
+        /// <summary>
+        /// Action masking to prevent clearly bad actions and reduce policy collapse.
+        /// Runs both in training and inference.
+        /// </summary>
+        public override void WriteDiscreteActionMask(IDiscreteActionMask actionMask)
+        {
+            if (!enableActionMasking) return;
+
+            // Only one branch with 5 actions: 0..4
+            // 0: Aggressive, 1: Maintain, 2: Retreat, 3: Flank, 4: Wait
+
+            float hpRatio = maxHP > 0.001f ? currentHP / maxHP : 1f;
+
+            // Determine distance to player if available
+            float distanceToPlayer = float.PositiveInfinity;
+            Vector3 playerPos;
+            if (TryGetPlayerPosition(out playerPos))
+            {
+                distanceToPlayer = Vector2.Distance(transform.position, playerPos);
+            }
+
+            // Mask AGGRESSIVE when low HP and within danger distance to discourage suicide
+            if (hpRatio < lowHpMaskThreshold && distanceToPlayer < dangerDistanceForAggressive)
+            {
+                actionMask.SetActionEnabled(0, 0, false); // disable Aggressive
+            }
+
+            // Mask WAIT when very far and healthy to discourage idling
+            if (distanceToPlayer > farDistanceDisableWait && hpRatio > 0.5f)
+            {
+                actionMask.SetActionEnabled(0, 4, false); // disable Wait
+            }
         }
     }
 }

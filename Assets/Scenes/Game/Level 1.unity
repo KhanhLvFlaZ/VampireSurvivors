@@ -30434,6 +30434,7 @@ MonoBehaviour:
   statsManager: {fileID: 1845134363}
   gameOverDialog: {fileID: 1042722128}
   gameTimer: {fileID: 2096653587}
+  globalMonsterHpScale: 3
 --- !u!114 &1764401685
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -30471,7 +30472,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1764401682}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 528806e471867f949b72ff5fbd4b2274, type: 3}
   m_Name: 
@@ -30485,7 +30486,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1764401682}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6917fbda5353cde4d8dad2533fbdece7, type: 3}
   m_Name: 

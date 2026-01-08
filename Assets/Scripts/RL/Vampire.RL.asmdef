@@ -6,6 +6,7 @@
     "Unity.TextMeshPro",
     "Unity.ML-Agents",
     "Unity.ML-Agents.Extensions",
+    "Unity.Barracuda",
     "Assembly-CSharp",
     "Unity.InputSystem"
   ],

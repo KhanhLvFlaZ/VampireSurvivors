@@ -11,13 +11,14 @@ namespace Vampire.Gameplay
     public class DisablePlayerInputComponent : MonoBehaviour
     {
         [SerializeField] private bool disableOnAwake = true;
-        [SerializeField] private bool logDisabledComponents = true;
+        [SerializeField] private bool logDisabledComponents = false;
 
         private void Awake()
         {
             if (disableOnAwake)
             {
-                DisableAllPlayerInputComponents();
+                // Disabled: Don't disable any PlayerInput components
+                // DisableAllPlayerInputComponents();
             }
         }
 
@@ -31,17 +32,21 @@ namespace Vampire.Gameplay
             {
                 if (pi.enabled)
                 {
-                    pi.enabled = false;
-                    disabledCount++;
-
-                    if (logDisabledComponents)
+                    // Only disable Player 2 and beyond (not the first player which uses WASD)
+                    if (pi.gameObject.name.Contains("2") || pi.gameObject.name.Contains("Player 2"))
                     {
-                        Debug.Log($"[DisablePlayerInput] Disabled PlayerInput on '{pi.gameObject.name}'");
+                        pi.enabled = false;
+                        disabledCount++;
+
+                        if (logDisabledComponents)
+                        {
+                            Debug.Log($"[DisablePlayerInput] Disabled PlayerInput on '{pi.gameObject.name}'");
+                        }
                     }
                 }
             }
 
-            if (logDisabledComponents)
+            if (logDisabledComponents && disabledCount > 0)
             {
                 Debug.Log($"[DisablePlayerInput] Disabled {disabledCount} PlayerInput component(s)");
             }

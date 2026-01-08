@@ -357,11 +357,20 @@ MonoBehaviour:
   moveSpeed: 3
   maxDetectionRange: 15
   optimalRange: 4
+  enableActionMasking: 1
+  lowHpMaskThreshold: 0.3
+  dangerDistanceForAggressive: 6
+  farDistanceDisableWait: 9
   allyCheckRadius: 10
   arenaCenter: {x: 0, y: 0}
   arenaHalfSize: 12
   wallMargin: 1
   showDebugGizmos: 0
+  debugLogInference: 1
+  logEveryNDecisions: 60
+  debugLogActionHistogram: 1
+  histogramEveryNDecisions: 100
+  histogramEverySeconds: 10
 --- !u!1001 &1613326256856120527
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Vampire.Utilities;
 
 namespace Vampire
 {
@@ -22,6 +23,20 @@ namespace Vampire
         private float timeSinceLastChestSpawned;
         private bool miniBossSpawned = false;
         private bool finalBossSpawned = false;
+
+        [Header("Debug")]
+        [SerializeField] private bool enableDebugLogging = false;
+
+        [Header("Difficulty Tuning")]
+        [SerializeField, Range(1f, 10f)] private float globalMonsterHpScale = 3f;
+
+        public float GetGlobalMonsterHpScale() => globalMonsterHpScale;
+
+        private void Awake()
+        {
+            // Set global logging state
+            // DebugLogging.EnableLogging = enableDebugLogging;
+        }
 
         public void Init(LevelBlueprint levelBlueprint)
         {
@@ -159,7 +174,10 @@ namespace Vampire
                     (int monsterIndex, float hpMultiplier) = levelBlueprint.monsterSpawnTable.SelectMonsterWithHPMultiplier(levelTime / levelBlueprint.levelTime);
                     (int poolIndex, int blueprintIndex) = levelBlueprint.MonsterIndexMap[monsterIndex];
                     MonsterBlueprint monsterBlueprint = levelBlueprint.monsters[poolIndex].monsterBlueprints[blueprintIndex];
-                    entityManager.SpawnMonsterRandomPosition(poolIndex, monsterBlueprint, monsterBlueprint.hp * hpMultiplier);
+                    float baseHp = monsterBlueprint.hp;
+                    float hpBuff = baseHp * (globalMonsterHpScale * (1f + hpMultiplier) - 1f);
+                    Debug.Log($"[LevelManager] Spawning monster: baseHp={baseHp:F1}, globalScale={globalMonsterHpScale:F1}x, hpMultiplier={hpMultiplier:F2}, hpBuff={hpBuff:F1}");
+                    entityManager.SpawnMonsterRandomPosition(poolIndex, monsterBlueprint, hpBuff);
                     timeSinceLastMonsterSpawned = Mathf.Repeat(timeSinceLastMonsterSpawned, monsterSpawnDelay);
                 }
             }

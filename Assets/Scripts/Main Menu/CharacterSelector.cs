@@ -11,7 +11,7 @@ namespace Vampire
         [SerializeField] protected CoinDisplay coinDisplay;
 
         private CharacterCard[] characterCards;
-        
+
         public void Init()
         {
             characterCards = new CharacterCard[characterBlueprints.Length];
@@ -26,7 +26,7 @@ namespace Vampire
                 characterCards[i].UpdateLayout();
             }
         }
-        
+
         public void StartGame(CharacterBlueprint characterBlueprint)
         {
             CrossSceneData.CharacterBlueprint = characterBlueprint;

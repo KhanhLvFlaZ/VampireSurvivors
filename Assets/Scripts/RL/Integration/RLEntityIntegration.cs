@@ -13,6 +13,7 @@ namespace Vampire.RL
     {
         private EntityManager entityManager;
         private RLLevelConfiguration rlLevelConfig;
+        private LevelManager levelManager;
         private List<RLMonsterAgent> activeRLMonsters = new List<RLMonsterAgent>();
         private Dictionary<string, int> rlMonsterPoolIndices = new Dictionary<string, int>();
         private int baseMonsterPoolCount;
@@ -41,6 +42,7 @@ namespace Vampire.RL
         private void Awake()
         {
             entityManager = GetComponent<EntityManager>();
+            levelManager = FindObjectOfType<LevelManager>();
         }
 
         /// <summary>
@@ -110,8 +112,15 @@ namespace Vampire.RL
             // Get or create pool for this RL blueprint
             int poolIndex = GetOrCreateRLMonsterPool(rlBlueprint);
 
-            // Spawn the monster
-            Monster baseMonster = entityManager.SpawnMonster(poolIndex, position, rlBlueprint);
+            // Calculate HP buff with global scaling
+            float baseHp = rlBlueprint.hp;
+            float globalHpScale = levelManager != null ? levelManager.GetGlobalMonsterHpScale() : 1f;
+            float hpBuff = baseHp * (globalHpScale - 1f);
+
+            // Spawn the monster with HP scaling applied
+            Monster baseMonster = entityManager.SpawnMonster(poolIndex, position, rlBlueprint, hpBuff);
+
+            Debug.Log($"[RLEntityIntegration] Spawned RL monster: baseHp={baseHp:F1}, globalScale={globalHpScale:F1}x, hpBuff={hpBuff:F1}, finalHp={baseMonster.HP:F1}");
 
             // Convert to RL monster if needed
             RLMonsterAgent rlMonster = baseMonster.GetComponent<RLMonsterAgent>();

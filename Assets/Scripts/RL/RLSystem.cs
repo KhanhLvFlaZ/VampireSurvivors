@@ -86,15 +86,38 @@ namespace Vampire.RL
             this.playerCharacter = playerCharacter;
             this.currentPlayerProfileId = playerProfileId ?? "default";
 
+            // Defer heavy initialization to prevent frame spike
+            StartCoroutine(InitializeComponentsGradually());
+        }
+
+        /// <summary>
+        /// Initialize components gradually across frames to prevent freeze
+        /// </summary>
+        private System.Collections.IEnumerator InitializeComponentsGradually()
+        {
+            // Phase 1: Core components
             InitializeComponents();
+            yield return null;
+
+            // Phase 2: Action spaces
             InitializeActionSpaces();
+            yield return null;
+
+            // Phase 3: Agent templates
             InitializeAgentTemplates();
+            yield return null;
+
+            // Phase 4: Metrics logger
             InitializeMetricsLogger();
+            yield return null;
+
+            // Phase 5: Inference cost control
             InitializeInferenceCostControl();
+            yield return null;
 
+            // Complete
             isInitialized = true;
-
-            Debug.Log($"RL System initialized with training mode: {defaultTrainingMode}");
+            Debug.Log($"RL System initialized gradually with training mode: {defaultTrainingMode}");
         }
 
         private void InitializeMetricsLogger()

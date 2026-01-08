@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -81,11 +82,20 @@ namespace Vampire
             centerTransform.SetParent(transform);
             centerTransform.position = transform.position + (Vector3)monsterHitbox.offset;
             // Set the drag based on acceleration and movespeed
-            float spd = Random.Range(monsterBlueprint.movespeed - 0.1f, monsterBlueprint.movespeed + 0.1f);
+            float spd = UnityEngine.Random.Range(monsterBlueprint.movespeed - 0.1f, monsterBlueprint.movespeed + 0.1f);
             rb.linearDamping = monsterBlueprint.acceleration / (spd * spd);
             // Reset the velocity
             rb.linearVelocity = Vector2.zero;
             StopAllCoroutines();
+
+            // After full setup, re-link RL agent (if present) so HP uses the buffed value
+            var rlAgentType = System.Type.GetType("Vampire.RL.RLMonsterAgent, Vampire.RL");
+            if (rlAgentType != null)
+            {
+                var rlAgent = GetComponent(rlAgentType);
+                var linkMethod = rlAgentType.GetMethod("LinkWithMonster", new[] { typeof(Monster) });
+                linkMethod?.Invoke(rlAgent, new object[] { this });
+            }
         }
 
         protected virtual void Update()
