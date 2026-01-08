@@ -386,9 +386,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   decisionIndicatorSize: 0.5
   decisionIndicatorDuration: 0.15
-  healthBarHeight: 0.15
+  healthBarHeight: 0.1
   healthBarOffset: 0.6
-  rlActiveColor: {r: 0.3, g: 0.5, b: 1, a: 0.8}
   actionAggressive: {r: 1, g: 0, b: 0, a: 1}
   actionMaintainDistance: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   actionRetreat: {r: 1, g: 0, b: 1, a: 1}

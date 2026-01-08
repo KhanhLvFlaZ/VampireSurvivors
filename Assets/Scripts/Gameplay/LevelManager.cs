@@ -355,6 +355,9 @@ namespace Vampire
                     img.rectTransform.sizeDelta = new Vector2(0.36f, 0.14f);
                 img.rectTransform.localPosition = Vector3.zero;
                 img.rectTransform.localRotation = Quaternion.identity;
+                // Set image type to Simple for rectangular appearance (not Sliced)
+                img.type = UnityEngine.UI.Image.Type.Simple;
+                img.useSpriteMesh = false;  // Disable sprite mesh for clean rectangular appearance
                 var c = img.color;
                 if (c.a < 0.9f) c.a = 1f;
                 if (c.r == 0 && c.g == 0 && c.b == 0) c = Color.white;
@@ -370,12 +373,16 @@ namespace Vampire
                 if (bg != null)
                 {
                     bg.sizeDelta = new Vector2(0.4f, 0.15f);
-                    bg.localPosition = Vector3.zero;
+                    bg.localPosition = new Vector3(0, 0.06f, 0);
                 }
                 if (fill != null)
                 {
+                    // Set up left-aligned rectangular bar
+                    fill.anchorMin = new Vector2(0, 0.5f);
+                    fill.anchorMax = new Vector2(0, 0.5f);
+                    fill.pivot = new Vector2(0, 0.5f);
                     fill.sizeDelta = new Vector2(0.36f, 0.11f);
-                    fill.localPosition = Vector3.zero;
+                    fill.localPosition = new Vector3(0, 0.06f, 0);
                 }
             }
 
